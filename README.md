@@ -1,6 +1,6 @@
 # Fortinet FortiLink Wireshark Dissector
 
-[![License](https://img.shields.io/badge/license-GPLv3-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-GPLv2-blue.svg)](LICENSE)
 
 ## Description
 
@@ -32,5 +32,5 @@ This dissector is provided for educational and troubleshooting purposes only. No
 
 ## License
 
-This project is licensed under the [GNU General Public License v3.0](LICENSE).
+This project is licensed under the [GNU General Public License v2.0](LICENSE).
 
