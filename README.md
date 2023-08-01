@@ -4,7 +4,7 @@
 
 ## Description
 
-This repository contains a custom Wireshark dissector for the Fortinet FortiLink protocol. FortiLink is a proprietary protocol used by Fortinet FortiSwitches to communicate with FortiGate devices and other FortiSwitches. The dissector enables Wireshark to decode and display FortiLink messages, making it easier to analyze and troubleshoot network communication between these devices.
+This repository contains a custom Wireshark dissector for the Fortinet FortiLink protocol. FortiLink is a proprietary protocol used by Fortinet FortiSwitches to communicate with other FortiSwitches and Fortigates. The dissector enables Wireshark to decode and display FortiLink messages, making it easier to analyze and troubleshoot network communication between these devices.
 The FortiLink protocol uses Ethernet type 0x88ff for communication.
 
 ![Wireshark Screenshot](/images/wireshark.png)
@@ -21,6 +21,14 @@ The FortiLink protocol uses Ethernet type 0x88ff for communication.
 2. Go to "Help" -> "About Wireshark" -> "Folders" -> "Personal Lua Plugins".
 3. Copy the `fortilink.lua` file from this repository into the "Personal Lua Plugins" folder.
 4. Restart Wireshark to enable the custom dissector.
+
+## Known limitations
+
+This dissector is still under development, some fields are still missing and some may be incorrect. 
+
+## Disclaimers
+
+This dissector is provided for educational and troubleshooting purposes only. No guarantees are provided.
 
 ## License
 
