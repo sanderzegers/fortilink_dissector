@@ -7,7 +7,7 @@
 This repository contains a custom Wireshark dissector for the Fortinet FortiLink protocol. FortiLink is a proprietary protocol used by Fortinet FortiSwitches to communicate with FortiGate devices and other FortiSwitches. The dissector enables Wireshark to decode and display FortiLink messages, making it easier to analyze and troubleshoot network communication between these devices.
 The FortiLink protocol uses Ethernet type 0x88ff for communication.
 
-![Wireshark Screenshot](/images/wireshark_screenshot.png)
+![Wireshark Screenshot](/images/wireshark.png)
 
 ## Features
 
