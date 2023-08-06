@@ -282,7 +282,7 @@ function dissectSendEcho(buffer, pinfo, tree)
     tree:add( fortilink.fields.flp_send_echo_src_serial, buffer(12,32))
     tree:add( fortilink.fields.flp_send_echo_src_interface, buffer(44,32))
     tree:add( fortilink.fields.flp_send_echo_dst_serial, buffer(76,32))
-    tree:add( fortilink.fields.flp_send_echo_dst_interface, buffer(108,32))
+    tree:add( fortilink.fields.flp_send_echo_dst_interface, buffer(108,buffer:len()-108))
 end
 
 function dissectSendEcho_Reply(buffer, pinfo, tree)
