@@ -87,20 +87,29 @@ fllldp.fields.serial = ProtoField.string("fllldp.serial", "Fortiswitch SerialNr"
 fllldp.fields.tlv_type = ProtoField.uint16("lldp.tlv.type","TLV Type",base.DEC,localtlv_types,0xfe00)
 fllldp.fields.tlv_len = ProtoField.uint16("lldp.tlv.len","TLV Length",base.DEC,nil,0x1ff)
 -- use already existing field: lldp.orgtlv.oui
-fllldp.fields.tlv_ou = ProtoField.uint24("lldp.tlv.ou", "Organization Unique Code",base.HEX)
+-- field_tlvoui = Field.new("lldp.orgtlv.oui")
+fllldp.fields.tlv_oui = ProtoField.uint24("lldp.orgtlv.oui", "Organization Unique Code",base.HEX)
+
 fllldp.fields.tlv_flinktype = ProtoField.uint8("lldp.tlv.flinktype", "FortiLink Packet Type",base.DEC,flp_types)
 fllldp.fields.tlv_content = ProtoField.bytes("lldp.unknown_subtype.content")
 
-fllldp.fields.fllldp_unknown1 = ProtoField.uint16("fllldp.unknown1","Unknown1",base.HEX)
+-- Trunk Flags
+fllldp.fields.fllldp_isl_port_options = ProtoField.uint32("fllldp.auto_isl_port_options","ISL Link options",base.HEX)
+ -- Auto create ISL between switches:
+fllldp.fields.fllldp_auto_isl = ProtoField.uint8("fllldp.auto_isl","auto-isl",base.DEC,nil,0x1)
+ -- Create auto mclag isl between switches:
+ fllldp.fields.fllldp_auto_mclag_isl = ProtoField.uint8("fllldp.auto_mclag_isl","auto-mclag-icl",base.DEC,nil,0x2)
+ -- Switch is already configured as MCLAG switch:
+ fllldp.fields.fllldp_mclag_switch = ProtoField.uint8("fllldp.is_mclag_switch","mclag-switch",base.DEC,nil,0x4)
+ -- Switch requests ISL-Fortilink
+ fllldp.fields.fllldp_isl_fortilink = ProtoField.uint8("fllldp.isl_fortilink","isl-fortilink",base.DEC,nil,0x10)
 
-fllldp.fields.fllldp_isl_port_options = ProtoField.uint16("fllldp.auto_isl_port_options","ISL Link options",base.HEX)
- fllldp.fields.fllldp_auto_isl = ProtoField.uint16("fllldp.auto_isl","auto-isl",base.DEC,nil,0x1)
- fllldp.fields.fllldp_auto_mclag_isl = ProtoField.uint16("fllldp.auto_mclag_isl","auto-mclag-icl",base.DEC,nil,0x2)
- fllldp.fields.fllldp_mclag_switch = ProtoField.uint16("fllldp.is_mclag_switch","mclag-switch",base.DEC,nil,0x4)
+
 
 fllldp.fields.fllldp_isl_port_group = ProtoField.uint16("fllldp.auto_isl_port_group","auto-isl-port-group",base.DEC)
 
-fllldp.fields.fllldp_unknown2 = ProtoField.uint8("fllldp.unknown2","SerialNr Length?",base.HEX)
+fllldp.fields.fllldp_trunknamelen = ProtoField.uint8("fllldp.trunknamelen","Trunkname length",base.DEC)
+fllldp.fields.fllldp_trunkname = ProtoField.string("fllldp.trunkname", "Trunkname")
 
 
 
@@ -134,7 +143,7 @@ function fllldp.dissector(tvb,pinfo,root)
 
     tree:add(fllldp.fields.tlv_type,tlv_type_length)
     tree:add(fllldp.fields.tlv_len,tlv_type_length)
-    tree:add(fllldp.fields.tlv_ou,tlv_oui)
+    tree:add(fllldp.fields.tlv_oui,tlv_oui)
     tree:add(fllldp.fields.tlv_flinktype,tlv_subtype)
 
 
@@ -150,17 +159,16 @@ function fllldp.dissector(tvb,pinfo,root)
     
     elseif tlv_subtype:uint() == 0x03 then
     
-        tree:add(fllldp.fields.fllldp_unknown1,tlv_content(0,2))
-
-        local subtree = tree:add(fllldp.fields.fllldp_isl_port_options,tlv_content(2,2))
+        local subtree = tree:add(fllldp.fields.fllldp_isl_port_options,tlv_content(0,4))
 
         subtree:add(fllldp.fields.fllldp_auto_isl,tlv_content(2,2))
         subtree:add(fllldp.fields.fllldp_auto_mclag_isl,tlv_content(2,2))
         subtree:add(fllldp.fields.fllldp_mclag_switch,tlv_content(2,2))
+        subtree:add(fllldp.fields.fllldp_isl_fortilink,tlv_content(2,2))
         
         tree:add(fllldp.fields.fllldp_isl_port_group,tlv_content(4,1))
-        tree:add(fllldp.fields.fllldp_unknown2,tlv_content(5,1))
-        tree:add(fllldp.fields.serial,tlv_content(6,16))
+        tree:add(fllldp.fields.fllldp_trunknamelen,tlv_content(5,1))
+        tree:add(fllldp.fields.fllldp_trunkname,tlv_content(6,16))
         
     end
 
