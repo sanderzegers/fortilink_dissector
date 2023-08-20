@@ -21,6 +21,39 @@ local fortilink_info =
 
 set_plugin_info(fortilink_info)
 
+local debug_level = {
+    DISABLED = 0,
+    LEVEL_1  = 1,
+    LEVEL_2  = 2
+}
+
+local DEBUG = debug_level.LEVEL_1
+
+local default_settings =
+{
+    debug_level  = debug_level.DISABLED,
+}
+
+local dprint = function() end
+local dprint2 = function() end
+local function reset_debug_level()
+    if default_settings.debug_level > debug_level.DISABLED then
+        dprint = function(...)
+            dprint2(...)
+        end
+
+        if default_settings.debug_level > debug_level.LEVEL_1 then
+            dprint2 = dprint
+        end
+    end
+end
+
+reset_debug_level()
+
+dprint2("Wireshark version = ", get_version())
+dprint2("Lua version = ", _VERSION)
+
+
 local packet_type = 
 {
     [0x00] = "flp_send_disc_pkt",
@@ -49,6 +82,16 @@ local tlv_type =
     [0x00006b] = "flp_fill_port_fgt_properties_with_portname_tlv",
 }
 
+local tlv_port_speed =
+-- maybe port properties in flp_fill_port_properties_with_portname_tlv
+{
+
+    [64] = "1GB"; --         0100 0000
+    [1024] = "10GB"; --  100 0000 0000
+    [512] = "40GB"; --    10 0000 0000
+
+}
+
 --- FortiLink fields
 
 fortilink = Proto("fortilink", "FortiLink") 
@@ -59,11 +102,13 @@ fortilink.fields.flcontentlength = ProtoField.uint16("FortiLink.contentlength", 
 fortilink.fields.flpacketreserved = ProtoField.uint16("FortiLink.packetreserved", "Fortilink Packet Reserved", base.HEX)
 fortilink.fields.flstaticvalue1 = ProtoField.uint16("FortiLink.staticvalue1", "Fortilink Static Value?", base.HEX)
 
+
+
 fortilink.fields.send_echo = ProtoField.bytes('FortiLink.send_echo', 'Echo')
-fortilink.fields.flp_send_echo_src_serial = ProtoField.string("FortiLink.send_echo.src_serial", "Source Serial")
-fortilink.fields.flp_send_echo_src_interface  = ProtoField.string("FortiLink.send_echo.src_interface", "Source Interface")
-fortilink.fields.flp_send_echo_dst_serial = ProtoField.string("FortiLink.send_echo.dst_serial", "Destination Serial")
-fortilink.fields.flp_send_echo_dst_interface = ProtoField.string("FortiLink.send_echo.dst_interface", "Destination Interface")
+fortilink.fields.flp_src_serial = ProtoField.string("FortiLink.src_serial", "Source Serial")
+fortilink.fields.flp_src_interface  = ProtoField.string("FortiLink.src_interface", "Source Interface")
+fortilink.fields.flp_dst_serial = ProtoField.string("FortiLink.dst_serial", "Destination Serial")
+fortilink.fields.flp_dst_interface = ProtoField.string("FortiLink.dst_interface", "Destination Interface")
 
 fortilink.fields.send_echo_reply = ProtoField.bytes('FortiLink.send_echo_reply', 'Echo Reply')
 
@@ -96,7 +141,12 @@ fortilink.fields.tlv_multiuplink  = ProtoField.uint8("FortiLink.multiuplink", "M
 fortilink.fields.tlv_uplink1  = ProtoField.string("FortiLink.multiuplink", "Uplink 1")
 fortilink.fields.tlv_uplink2  = ProtoField.string("FortiLink.multiuplink", "Uplink 2")
 
-fortilink.fields.tlv_isl_properties  = ProtoField.uint32("FortiLink.tlv_isl.properties", "properties?")
+fortilink.fields.tlv_isl_properties  = ProtoField.uint32("FortiLink.tlv_isl.properties", "Trunk Properties",base.HEX)
+fortilink.fields.tlv_isl_properties_fortilink = ProtoField.uint8("FortiLink.tlv_isl.properties.fortilink","Fortilink",base.DEC,nil,0x1)
+fortilink.fields.tlv_isl_properties_auto_isl = ProtoField.uint8("FortiLink.tlv_isl.properties.auto-isl","auto-isl",base.DEC,nil,0x10)
+fortilink.fields.tlv_isl_properties_mclag_icl = ProtoField.uint8("FortiLink.tlv_isl.properties.mclag-icl","mclag-icl",base.DEC,nil,0x20)
+
+
 fortilink.fields.tlv_isl_port  = ProtoField.string("FortiLink.tlv_isl.port", "Port")
 fortilink.fields.tlv_isl_trunk  = ProtoField.string("FortiLink.tlv_isl.trunk", "Trunk")
 fortilink.fields.tlv_isl_peer_port  = ProtoField.string("FortiLink.tlv_isl.peer_port", "Peer Port")
@@ -120,7 +170,7 @@ function dissectFaceplate_ltv(buffer, pinfo, tree)
 end
 
 function dissectPort_properties_tlv(buffer, pinfo, tree)
-    print("dissectPort_properties_tlv")
+    dprint2("dissectPort_properties_tlv")
     local subtree = tree:add(buffer(0,buffer:len()),"Port_properties_tlv")
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
@@ -128,7 +178,7 @@ function dissectPort_properties_tlv(buffer, pinfo, tree)
 end
 
 function dissectPort_switch_info_tlv(buffer, pinfo, tree)
-    print("dissectPort_switch_info_tlv")
+    dprint2("dissectPort_switch_info_tlv")
     local subtree = tree:add(buffer(0,buffer:len()),"Port_switch_info_tlv")
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
@@ -143,7 +193,7 @@ function dissectPort_switch_info_tlv(buffer, pinfo, tree)
 end
 
 function dissectPort_port_prefix_tlv(buffer, pinfo, tree)
-    print("dissectPort_port_prefix_tlv")
+    dprint2("dissectPort_port_prefix_tlv")
     local subtree = tree:add(buffer(0,buffer:len()),"Port_port_prefix_tlv")
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
@@ -152,33 +202,32 @@ end
 
 
 function dissectPort_start_tlv(buffer, pinfo, tree)
-    print("dissectPort_start_tlv")
+    dprint2("dissectPort_start_tlv")
     -- pinfo.cols.info = "Start TLV"
     local subtree = tree:add(buffer(0,buffer:len()),"start_tlv")
-    print("buffer 2: " .. buffer(0,2))
+    dprint2("buffer 2: " .. buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
     subtree:add( fortilink.fields.flp_start_tlv_data, buffer(4,buffer:len()-4))
 end
 
 function dissectPort_marker_tlv(buffer, pinfo, tree)
-    print("dissectPort_marker_tlv")
+    dprint2("dissectPort_marker_tlv")
     local subtree = tree:add(buffer(0,buffer:len()),"marker_tlv")
-    print("buffer 2: " .. buffer(0,2))
+    dprint2("buffer 2: " .. buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
     -- subtree:add( fortilink.fields.flp_start_tlv_data, buffer(4,buffer:len()-4))
 end
 
 function dissectPort_port_properties_with_portname_tlv(buffer, pinfo, tree)
-    print("dissectPort_port_properties_with_portname_tlv")
+    dprint2("dissectPort_port_properties_with_portname_tlv")
     -- pinfo.cols.info = "Port Properties"
     local subtree = tree:add(buffer(0,buffer:len()),"port_properties")
-    print("buffer 2: " .. buffer(0,2))
+    dprint2("buffer 2: " .. buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
-    -- subtree:add( fortilink.fields.flp_start_tlv_data, buffer(4,buffer:len()-4))
-    
+
     subtree:add( fortilink.fields.tlv_portid , buffer(9,2))
     subtree:add( fortilink.fields.tlv_portname , buffer(11,17))
 
@@ -187,15 +236,21 @@ function dissectPort_port_properties_with_portname_tlv(buffer, pinfo, tree)
 end
 
 function dissectPort_port_isl_properties_with_portname_tlv(buffer, pinfo, tree)
-    print("dissectPort_port_isl_properties_with_portname_tlv")
+    dprint2("dissectPort_port_isl_properties_with_portname_tlv")
     -- pinfo.cols.info = "isl_properties_with_portname_tlv"
     local subtree = tree:add(buffer(0,buffer:len()),"isl_properties_with_portname_tlv")
-    print("buffer 2: " .. buffer(0,2))
+    dprint2("buffer 2: " .. buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
     
     -- subtree:add( fortilink.fields.flp_start_tlv_data, buffer(4,buffer:len()-4))
-    subtree:add( fortilink.fields.tlv_isl_properties, buffer(4,4))
+    local islportsub = subtree:add( fortilink.fields.tlv_isl_properties, buffer(4,4))
+    islportsub:add(fortilink.fields.tlv_isl_properties_fortilink,buffer(4,4))
+    islportsub:add(fortilink.fields.tlv_isl_properties_auto_isl,buffer(4,4))
+    islportsub:add(fortilink.fields.tlv_isl_properties_mclag_icl,buffer(4,4))
+
+    
+
     subtree:add( fortilink.fields.tlv_isl_port, buffer(8,17))
     subtree:add( fortilink.fields.tlv_isl_trunk, buffer(25,17))
     subtree:add( fortilink.fields.tlv_isl_peer_port, buffer(42,17))
@@ -203,14 +258,15 @@ function dissectPort_port_isl_properties_with_portname_tlv(buffer, pinfo, tree)
 end
 
 function dissectPort_port_fgt_properties_with_portname_tlv(buffer, pinfo, tree)
-    print("dissectPort_port_fgt_properties_with_portname_tlv")
-    -- pinfo.cols.info = "fgt_properties_with_portname_tlv"
+    dprint2("dissectPort_port_fgt_properties_with_portname_tlv")
+
     local subtree = tree:add(buffer(0,buffer:len()),"fgt_properties_with_portname_tlv")
-    print("buffer 2: " .. buffer(0,2))
+    dprint2("buffer 2: " .. buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_type , buffer(0,2))
     subtree:add( fortilink.fields.flp_tlv_length, buffer(2,2))
-    -- subtree:add( fortilink.fields.flp_start_tlv_data, buffer(4,buffer:len()-4))
-    subtree:add( fortilink.fields.tlv_fgt_port_properties, buffer(4,4))
+
+    local islportsub = subtree:add( fortilink.fields.tlv_isl_properties, buffer(4,4))
+    islportsub:add(fortilink.fields.tlv_isl_properties_fortilink,buffer(4,4))
     subtree:add( fortilink.fields.tlv_fgt_port_port, buffer(8,17))
     subtree:add( fortilink.fields.tlv_fgt_port_fgt_port, buffer(25,17))
     subtree:add( fortilink.fields.tlv_fgt_port_fgt_device, buffer(42,17))
@@ -266,6 +322,10 @@ function fortilink.dissector(buffer, pinfo, tree)
         dissectSendDiscovery(buffer,pinfo,subtree)
     elseif pkt_type_str == "flp_send_discovery_response" then
         disscectSendDiscovery_Response(buffer,pinfo,subtree)
+    elseif pkt_type_str == "flp_send_join_request" then
+        disscectSendJoinRequest(buffer,pinfo,subtree)
+    elseif pkt_type_str == "flp_send_join_response" then
+        disscectSendJoinResponse(buffer,pinfo,subtree)
     end
 
 end
@@ -276,13 +336,11 @@ end
 
 function dissectSendEcho(buffer, pinfo, tree)
     pinfo.cols.info = "Echo Request Packet"
-    -- local subtree = tree:add(tree,buffer(), "Echo Request Packet")
-    -- local subtree = tree:add(fortilink.fields.send_echo,buffer(12,128), "Echo Request Packet")
     
-    tree:add( fortilink.fields.flp_send_echo_src_serial, buffer(12,32))
-    tree:add( fortilink.fields.flp_send_echo_src_interface, buffer(44,32))
-    tree:add( fortilink.fields.flp_send_echo_dst_serial, buffer(76,32))
-    tree:add( fortilink.fields.flp_send_echo_dst_interface, buffer(108,buffer:len()-108))
+    tree:add( fortilink.fields.flp_src_serial, buffer(12,32))
+    tree:add( fortilink.fields.flp_src_interface, buffer(44,32))
+    tree:add( fortilink.fields.flp_dst_serial, buffer(76,32))
+    tree:add( fortilink.fields.flp_dst_interface, buffer(108,buffer:len()-108))
 end
 
 function dissectSendEcho_Reply(buffer, pinfo, tree)
@@ -290,12 +348,29 @@ function dissectSendEcho_Reply(buffer, pinfo, tree)
     tree:add(fortilink.fields.send_echo_reply,buffer(10,buffer:len()-10))
 end
 
+function disscectSendJoinRequest(buffer, pinfo, tree)
+    pinfo.cols.info = "Join Request"
+    -- local src_serial = buffer(10,32)
+    -- pinfo.cols.info = "Join Request, src_serial=" .. src_serial:string()
+
+    tree:add( fortilink.fields.flp_src_serial, buffer(10,32))
+    tree:add( fortilink.fields.flp_src_interface, buffer(42,32))
+    tree:add( fortilink.fields.flp_dst_serial, buffer(74,32))
+    tree:add( fortilink.fields.flp_dst_interface, buffer(106,32))
+
+end
+
+function disscectSendJoinResponse(buffer, pinfo, tree)
+    pinfo.cols.info = "Join Response"
+
+end
+
 
 function dissectSendUpdate(buffer, pinfo, tree)
     pinfo.cols.info = "Send Update packet"
     
-    tree:add( fortilink.fields.flp_send_echo_src_serial, buffer(10,32))
-    tree:add( fortilink.fields.flp_send_echo_src_interface, buffer(42,32))
+    tree:add( fortilink.fields.flp_src_serial, buffer(10,32))
+    tree:add( fortilink.fields.flp_src_interface, buffer(42,32))
 
     -- local subtree = tree:add(fortilink.fields.tlv,buffer(74,buffer:len()-74))
 
@@ -304,19 +379,19 @@ function dissectSendUpdate(buffer, pinfo, tree)
     while counter < buffer:len() do
         -- local func = byte_to_func[buffer(counter,2):uint()]
         local test = string.format("%02x", buffer(counter,2):uint())
-        -- print(test)
+        -- dprint2(test)
         local func = tlv_type_function[buffer(counter,2):uint()]
         local name = tlv_type[buffer(counter,2):uint()]
-        -- print("name: " .. name)
+        -- dprint2("name: " .. name)
         
         local len = buffer(counter+2,2):uint()
-        print("tlv_id: " .. test .. " length: " .. len)
+        dprint2("tlv_id: " .. test .. " length: " .. len)
         if func then
-            -- print("Calling " .. name)
-            print(buffer(counter,len+4))
+            -- dprint2("Calling " .. name)
+            dprint2(buffer(counter,len+4))
             func(buffer(counter,len+4),pinfo,tree)  -- Call the function
         else
-            print("No function found for " .. test)
+            dprint2("No function found for " .. test)
         end
         counter = counter + 4 + len
     end
@@ -328,29 +403,27 @@ end
 function dissectSendDiscovery(buffer, pinfo, tree)
     pinfo.cols.info = "Send Discovery packet"
     
-    tree:add( fortilink.fields.flp_send_echo_src_serial, buffer(10,32))
-    tree:add( fortilink.fields.flp_send_echo_src_interface, buffer(42,32))
-
-    -- local subtree = tree:add(fortilink.fields.tlv,buffer(74,buffer:len()-74))
+    tree:add( fortilink.fields.flp_src_serial, buffer(10,32))
+    tree:add( fortilink.fields.flp_src_interface, buffer(42,32))
 
     local counter = 74
     
     while counter < buffer:len() do
-        -- local func = byte_to_func[buffer(counter,2):uint()]
+
         local test = string.format("%02x", buffer(counter,2):uint())
-        -- print(test)
+
         local func = tlv_type_function[buffer(counter,2):uint()]
         local name = tlv_type[buffer(counter,2):uint()]
-        -- print("name: " .. name)
+
         
         local len = buffer(counter+2,2):uint()
-        print("tlv_id: " .. test .. " length: " .. len)
+        dprint2("tlv_id: " .. test .. " length: " .. len)
         if func then
-            -- print("Calling " .. name)
-            print(buffer(counter,len+4))
+
+            dprint2(buffer(counter,len+4))
             func(buffer(counter,len+4),pinfo,tree)  -- Call the function
         else
-            print("No function found for " .. test)
+            dprint2("No function found for " .. test)
         end
         counter = counter + 4 + len
     end
@@ -359,12 +432,12 @@ function dissectSendDiscovery(buffer, pinfo, tree)
 end
 
 function disscectSendDiscovery_Response(buffer, pinfo, tree)
-    pinfo.cols.info = "Discovery Repsonse"
+    pinfo.cols.info = "Discovery Response"
     
-    tree:add( fortilink.fields.flp_send_echo_src_serial, buffer(12,32))
-    tree:add( fortilink.fields.flp_send_echo_src_interface, buffer(44,32))
-    tree:add( fortilink.fields.flp_send_echo_dst_serial, buffer(76,32))
-    tree:add( fortilink.fields.flp_send_echo_dst_interface, buffer(108,32))
+    tree:add( fortilink.fields.flp_src_serial, buffer(12,32))
+    tree:add( fortilink.fields.flp_src_interface, buffer(44,32))
+    tree:add( fortilink.fields.flp_dst_serial, buffer(76,32))
+    tree:add( fortilink.fields.flp_dst_interface, buffer(108,32))
     tree:add( fortilink.fields.flp_send_disc_resp_static, buffer(140,4))
     
 end
@@ -377,3 +450,28 @@ end
 
 ether_table = DissectorTable.get("ethertype")
 ether_table:add(0x88ff, fortilink)
+
+
+local debug_pref_enum = {
+    { 1,  "Disabled", debug_level.DISABLED },
+    { 2,  "Level 1",  debug_level.LEVEL_1  },
+    { 3,  "Level 2",  debug_level.LEVEL_2  },
+}
+
+----------------------------------------
+-- register our preferences
+
+fortilink.prefs.debug       = Pref.enum("Debug", default_settings.debug_level,
+                                        "The debug printing level", debug_pref_enum)
+
+----------------------------------------
+-- the function for handling preferences being changed
+function fortilink.prefs_changed()
+    dprint2("prefs_changed called")
+
+    default_settings.debug_level = fortilink.prefs.debug
+    reset_debug_level()
+
+end
+
+dprint2("pcapfile Prefs registered")

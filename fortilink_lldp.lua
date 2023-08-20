@@ -31,7 +31,7 @@ local DEBUG = debug_level.LEVEL_1
 
 local default_settings =
 {
-    debug_level  = DEBUG,
+    debug_level  = debug_level.DISABLED,
 }
 
 
