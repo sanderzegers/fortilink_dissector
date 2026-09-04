@@ -37,9 +37,12 @@ local default_settings =
 local dprint = function() end
 local dprint2 = function() end
 local function reset_debug_level()
+    dprint = function() end
+    dprint2 = function() end
+
     if default_settings.debug_level > debug_level.DISABLED then
         dprint = function(...)
-            dprint2(...)
+            print(...)
         end
 
         if default_settings.debug_level > debug_level.LEVEL_1 then
@@ -72,7 +75,6 @@ local tlv_type =
     [0x000066] = "flp_fill_port_properties_tlv",
     [0x000064] = "flp_fill_switch_info_tlv",
     [0x000065] = "flp_fill_port_prefix_tlv",
-    [0x000066] = "flp_fill_port_properties_with_portname_tlv",
     [0x000067] = "flp_fill_port_properties_with_portname_tlv", -- ?
     [0x000068] = "flp_fill_port_properties_with_portname_tlv", -- ?
     [0x001234] = "flp_fill_start_tlv",
@@ -96,7 +98,7 @@ local tlv_port_speed =
 
 fortilink = Proto("fortilink", "FortiLink") 
 
-fortilink.fields.flversion = ProtoField.uint32("FortiLink.version", "Fortilink Version")
+fortilink.fields.flversion = ProtoField.uint24("FortiLink.version", "Fortilink Version")
 fortilink.fields.flpackettype = ProtoField.uint8("FortiLink.packettype", "Fortilink Packet Type", base.HEX,packet_type)
 fortilink.fields.flcontentlength = ProtoField.uint16("FortiLink.contentlength", "Fortilink Packet Content Length")
 fortilink.fields.flpacketreserved = ProtoField.uint16("FortiLink.packetreserved", "Fortilink Packet Reserved", base.HEX)
@@ -120,8 +122,8 @@ fortilink.fields.flp_send_disc_resp_static  = ProtoField.uint32("FortiLink.send_
 
 -- TLVs
 
-fortilink.fields.flp_tlv_type  = ProtoField.uint32("FortiLink.tlv_type", "TLV Type", base.HEX, tlv_type)
-fortilink.fields.flp_tlv_length  = ProtoField.uint32("FortiLink.tlv_length", "TLV Length", base.DEC)
+fortilink.fields.flp_tlv_type  = ProtoField.uint16("FortiLink.tlv_type", "TLV Type", base.HEX, tlv_type)
+fortilink.fields.flp_tlv_length  = ProtoField.uint16("FortiLink.tlv_length", "TLV Length", base.DEC)
 
 fortilink.fields.flp_start_tlv_data  = ProtoField.bytes("FortiLink.start_tlv.data", "Data")
 fortilink.fields.faceplate_data  = ProtoField.string("FortiLink.faceplate_data", "Faceplate XML")
@@ -282,7 +284,6 @@ local tlv_type_function =
     [0x000066] = dissectPort_properties_tlv,
     [0x000064] = dissectPort_switch_info_tlv,
     [0x000065] = dissectPort_port_prefix_tlv,
-    [0x000066] = dissectPort_port_properties_with_portname_tlv,
     [0x000067] = dissectPort_port_properties_with_portname_tlv, -- ?
     [0x000068] = dissectPort_port_properties_with_portname_tlv, -- ?
     [0x001234] = dissectPort_start_tlv,
@@ -441,12 +442,6 @@ function disscectSendDiscovery_Response(buffer, pinfo, tree)
     tree:add( fortilink.fields.flp_send_disc_resp_static, buffer(140,4))
     
 end
-
-function dissectSendEcho_Reply(buffer, pinfo, tree)
-    pinfo.cols.info = "Echo Reply Packet"
-    tree:add(fortilink.fields.send_echo_reply,buffer(10,buffer:len()-10))
-end
-
 
 ether_table = DissectorTable.get("ethertype")
 ether_table:add(0x88ff, fortilink)
