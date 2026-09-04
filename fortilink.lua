@@ -13,7 +13,7 @@
 
 local fortilink_info = 
 {
-    version = "0.1",
+    version = "0.2",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink packets",
     repository = "https://github.com/"

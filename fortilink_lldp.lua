@@ -14,7 +14,7 @@
 
 local fllldp_info =
 {
-    version = "0.1",
+    version = "0.2",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink LLDP Payloads",
 }
@@ -122,6 +122,7 @@ function fllldp.dissector(tvb,pinfo,root)
     local tlv_oui = tvb(2,3)
     local tlv_subtype = tvb(5,1) 
     local tlv_content = tvb(6,tvb:len()-6)
+    local subtype = tlv_subtype:uint()
 
     dprint2(tlv_oui)
     dprint2(tlv_subtype)
@@ -131,14 +132,18 @@ function fllldp.dissector(tvb,pinfo,root)
 
     -- TLV Header
 
-    if tlv_subtype:uint() == 0x01 then
+    local tree
+
+    if subtype == 0x01 then
         tree = root:add(tvb(0,tvb:len()),"FortiSwitch Hostname = " .. tlv_content:string())
     
-    elseif tlv_subtype:uint() == 0x02 then
+    elseif subtype == 0x02 then
         tree = root:add(tvb(0,tvb:len()),"FortiSwitch Serial = " .. tlv_content:string())
     
-    elseif tlv_subtype:uint() == 0x03 then
+    elseif subtype == 0x03 then
         tree = root:add(tvb(0,tvb:len()),"FortiSwitch - Link Properties")
+    else
+        tree = root:add(tvb(0,tvb:len()),string.format("FortiSwitch - Unknown subtype 0x%02x", subtype))
     end
 
     tree:add(fllldp.fields.tlv_type,tlv_type_length)
@@ -149,15 +154,15 @@ function fllldp.dissector(tvb,pinfo,root)
 
     -- TLV Content
 
-    if tlv_subtype:uint() == 0x01 then
+    if subtype == 0x01 then
     
         tree:add(fllldp.fields.hostname,tlv_content)
     
-    elseif tlv_subtype:uint() == 0x02 then
+    elseif subtype == 0x02 then
     
         tree:add(fllldp.fields.serial,tlv_content)
     
-    elseif tlv_subtype:uint() == 0x03 then
+    elseif subtype == 0x03 then
     
         local subtree = tree:add(fllldp.fields.fllldp_isl_port_options,tlv_content(0,4))
 
@@ -169,7 +174,8 @@ function fllldp.dissector(tvb,pinfo,root)
         tree:add(fllldp.fields.fllldp_isl_port_group,tlv_content(4,1))
         tree:add(fllldp.fields.fllldp_trunknamelen,tlv_content(5,1))
         tree:add(fllldp.fields.fllldp_trunkname,tlv_content(6,16))
-        
+    else
+        tree:add(fllldp.fields.tlv_content,tlv_content)
     end
 
 end
