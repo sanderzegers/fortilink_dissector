@@ -17,16 +17,22 @@ The dissector enables Wireshark to decode and display FortiLink messages, making
 - Detailed information about message types, fields, and values.
 - Automatic recognition of FortiLink packets within capture files.
 
+## Sample Captures
+
+The [`pcaps`](pcaps/README.md) folder contains sanitized packet captures of FortiLink discovery and authorization, along with FortiLink LLDP traffic from different access-port profiles.
+
+The captures contain only LLDP and FortiLink (`0x88ff`) traffic. CAPWAP/DTLS and HTTPS management traffic is not included. See the capture README for the topology, device versions, capture points, and individual file descriptions.
+
 ## Installation
 
 1. Launch Wireshark.
 2. Go to "Help" -> "About Wireshark" -> "Folders" -> "Personal Lua Plugins".
-3. Copy the `fortilink.lua` and `fortilink_lldp.lua` file from this repository into the "Personal Lua Plugins" folder.
+3. Copy the `fortilink.lua` and `fortilink_lldp.lua` files from this repository into the "Personal Lua Plugins" folder.
 4. Restart Wireshark to enable the custom dissector.
 
 ## Known limitations
 
-This dissector is still under development, some fields are still missing and some may be incorrect. 
+This dissector is still under development. Some fields are still missing, and some may be incorrect.
 
 ## Disclaimers
 
@@ -35,4 +41,3 @@ This dissector is provided for educational and troubleshooting purposes only. No
 ## License
 
 This project is licensed under the [GNU General Public License v2.0](LICENSE).
-
