@@ -13,7 +13,7 @@
 
 local fortilink_info = 
 {
-    version = "0.2",
+    version = "0.2a",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink packets",
     repository = "https://github.com/"
@@ -75,8 +75,8 @@ local tlv_type =
     [0x000066] = "flp_fill_port_properties_tlv",
     [0x000064] = "flp_fill_switch_info_tlv",
     [0x000065] = "flp_fill_port_prefix_tlv",
-    [0x000067] = "flp_fill_port_properties_with_portname_tlv", -- ?
-    [0x000068] = "flp_fill_port_properties_with_portname_tlv", -- ?
+    [0x000067] = "flp_fill_port_properties_with_portname_tlv",
+    [0x000068] = "flp_fill_port_properties_with_portname_tlv",
     [0x001234] = "flp_fill_start_tlv",
     [0x005678] = "flp_fill_marker_tlv",
     [0x00cdef] = "flp_fill_marker_tlv",
@@ -102,7 +102,8 @@ fortilink.fields.flversion = ProtoField.uint24("FortiLink.version", "Fortilink V
 fortilink.fields.flpackettype = ProtoField.uint8("FortiLink.packettype", "Fortilink Packet Type", base.HEX,packet_type)
 fortilink.fields.flcontentlength = ProtoField.uint16("FortiLink.contentlength", "Fortilink Packet Content Length")
 fortilink.fields.flpacketreserved = ProtoField.uint16("FortiLink.packetreserved", "Fortilink Packet Reserved", base.HEX)
-fortilink.fields.flstaticvalue1 = ProtoField.uint16("FortiLink.staticvalue1", "Fortilink Static Value?", base.HEX)
+-- FortiGate generates this per fortilinkd init from /dev/urandom; FortiSwitch builds observed fixed 0xf1dc.
+fortilink.fields.flendpointnonce = ProtoField.uint16("FortiLink.endpoint_nonce", "Endpoint Nonce", base.HEX)
 
 
 
@@ -307,7 +308,7 @@ function fortilink.dissector(buffer, pinfo, tree)
     subtree:add( fortilink.fields.flpackettype, buffer(3,1))    
     subtree:add( fortilink.fields.flcontentlength, buffer(4,2))
     subtree:add( fortilink.fields.flpacketreserved, buffer(6,2))
-    subtree:add( fortilink.fields.flstaticvalue1, buffer(8,2))
+    subtree:add( fortilink.fields.flendpointnonce, buffer(8,2))
 
     local pkt_type_str = packet_type[buffer(3,1):uint()]
 
