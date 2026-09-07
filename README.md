@@ -23,6 +23,12 @@ The [`pcaps`](pcaps/README.md) folder contains sanitized packet captures of Fort
 
 The captures contain only LLDP and FortiLink (`0x88ff`) traffic. CAPWAP/DTLS and HTTPS management traffic is not included. See the capture README for the topology, device versions, capture points, and individual file descriptions.
 
+## Display Filters
+
+FortiLink LLDP extension fields use the `fllldp` namespace. Useful structural filters include `fllldp.tlv.type`, `fllldp.tlv.len`, `fllldp.oui`, `fllldp.subtype`, and `fllldp.content`.
+
+Payload filters such as `fllldp.auto_isl_port_options`, `fllldp.auto_network`, `fllldp.peer_id`, and `fllldp.trailing_data` expose decoded link-property values.
+
 ## Installation
 
 1. Launch Wireshark.

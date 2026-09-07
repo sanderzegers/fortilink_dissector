@@ -16,7 +16,7 @@
 
 local fllldp_info =
 {
-    version = "0.5a",
+    version = "0.6",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink LLDP Payloads",
     repository = "https://github.com/sanderzegers/fortilink_dissector"
@@ -77,10 +77,9 @@ local localtlv_types =
 
 local flp_types = 
 {
-    [0x00] = "0",
-    [0x01] = "1",
-    [0x02] = "2",
-    [0x03] = "3",
+    [0x01] = "Hostname",
+    [0x02] = "Serial Number",
+    [0x03] = "Link Properties",
 }
 
 local isl_trunk_mode_selectors =
@@ -114,14 +113,12 @@ local fllldp = Proto.new("fllldp","FortiLink LLDP")
 fllldp.fields.hostname = ProtoField.string("fllldp.hostname", "Fortiswitch Hostname")
 fllldp.fields.serial = ProtoField.string("fllldp.serial", "Fortiswitch SerialNr")
 
-fllldp.fields.tlv_type = ProtoField.uint16("lldp.tlv.type","TLV Type",base.DEC,localtlv_types,0xfe00)
-fllldp.fields.tlv_len = ProtoField.uint16("lldp.tlv.len","TLV Length",base.DEC,nil,0x1ff)
--- use already existing field: lldp.orgtlv.oui
--- field_tlvoui = Field.new("lldp.orgtlv.oui")
-fllldp.fields.tlv_oui = ProtoField.uint24("lldp.orgtlv.oui", "Organization Unique Code",base.HEX)
+fllldp.fields.tlv_type = ProtoField.uint16("fllldp.tlv.type","TLV Type",base.DEC,localtlv_types,0xfe00)
+fllldp.fields.tlv_len = ProtoField.uint16("fllldp.tlv.len","TLV Length",base.DEC,nil,0x1ff)
+fllldp.fields.tlv_oui = ProtoField.uint24("fllldp.oui", "Organization Unique Code",base.HEX)
 
-fllldp.fields.tlv_flinktype = ProtoField.uint8("lldp.tlv.flinktype", "FortiLink Packet Type",base.DEC,flp_types)
-fllldp.fields.tlv_content = ProtoField.bytes("lldp.unknown_subtype.content")
+fllldp.fields.tlv_flinktype = ProtoField.uint8("fllldp.subtype", "FortiLink Subtype",base.DEC,flp_types)
+fllldp.fields.tlv_content = ProtoField.bytes("fllldp.content", "Raw content")
 
 -- Trunk Flags
 fllldp.fields.fllldp_isl_port_options = ProtoField.uint32("fllldp.auto_isl_port_options","ISL Link options",base.HEX)
@@ -188,15 +185,15 @@ function fllldp.dissector(tvb,pinfo,root)
     local tree
 
     if subtype == 0x01 then
-        tree = root:add(tvb(0,tvb:len()),"FortiSwitch Hostname = " .. tlv_content:string())
+        tree = root:add(fllldp,tvb(),"FortiLink LLDP - Hostname: " .. tlv_content:string())
     
     elseif subtype == 0x02 then
-        tree = root:add(tvb(0,tvb:len()),"FortiSwitch Serial = " .. tlv_content:string())
+        tree = root:add(fllldp,tvb(),"FortiLink LLDP - Serial Number: " .. tlv_content:string())
     
     elseif subtype == 0x03 then
-        tree = root:add(tvb(0,tvb:len()),"FortiSwitch - Link Properties")
+        tree = root:add(fllldp,tvb(),"FortiLink LLDP - Link Properties")
     else
-        tree = root:add(tvb(0,tvb:len()),string.format("FortiSwitch - Unknown subtype 0x%02x", subtype))
+        tree = root:add(fllldp,tvb(),string.format("FortiLink LLDP - Unknown subtype 0x%02x", subtype))
     end
 
     tree:add(fllldp.fields.tlv_type,tlv_type_length)

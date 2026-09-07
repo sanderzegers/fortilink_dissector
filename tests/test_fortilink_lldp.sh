@@ -12,6 +12,11 @@ luac -p "$lua_script"
 
 fields=$(tshark -G fields -X "lua_script:$lua_script")
 for field in \
+    fllldp.tlv.type \
+    fllldp.tlv.len \
+    fllldp.oui \
+    fllldp.subtype \
+    fllldp.content \
     fllldp.peer_id_len \
     fllldp.peer_id \
     fllldp.unknown_options \
@@ -79,8 +84,8 @@ if [ "$selectors" != "$selectors_expected" ]; then
 fi
 
 unknown_subtype=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
-    -Y 'lldp.tlv.flinktype == 0x7f' -T fields \
-    -e frame.number -e lldp.unknown_subtype.content)
+    -Y 'fllldp.subtype == 0x7f' -T fields \
+    -e frame.number -e fllldp.content)
 unknown_subtype_expected=$(printf '6\tdead')
 if [ "$unknown_subtype" != "$unknown_subtype_expected" ]; then
     printf '%s\n' 'Unknown subtype was not decoded safely as raw content:' "$unknown_subtype" >&2
