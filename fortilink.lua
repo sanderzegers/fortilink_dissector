@@ -15,10 +15,10 @@
 
 local fortilink_info =
 {
-    version = "0.4",
+    version = "0.4a",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink packets",
-    repository = "https://github.com/"
+    repository = "https://github.com/sanderzegers/fortilink_dissector"
 }
 
 set_plugin_info(fortilink_info)
@@ -171,6 +171,7 @@ fortilink.fields.faceplate_data  = ProtoField.string("FortiLink.faceplate_data",
 
 fortilink.fields.tlv = ProtoField.bytes('FortiLink.tlv', 'TLV')
 fortilink.fields.tlv_value = ProtoField.bytes("FortiLink.tlv_value", "TLV Value")
+fortilink.fields.tlv_trailing_data = ProtoField.bytes("FortiLink.tlv_trailing_data", "Trailing TLV Data")
 
 fortilink.fields.tlv_portname  = ProtoField.string("FortiLink.tlv_portname", "Portname")
 fortilink.fields.tlv_portid  = ProtoField.uint16("FortiLink.tlv_portid", "Port ID")
@@ -296,6 +297,9 @@ local function add_tlv_tree(buffer, tree, label, minimum_length, show_raw_value)
         subtree:add(fortilink.fields.tlv_value, buffer(4,buffer:len()-4))
     end
     if minimum_length and buffer:len() < minimum_length then
+        if buffer:len() > 4 and not show_raw_value then
+            subtree:add(fortilink.fields.tlv_value, buffer(4,buffer:len()-4))
+        end
         add_malformed(subtree, string.format("%s needs at least %d bytes; only %d available", label, minimum_length, buffer:len()))
         return subtree, false
     end
@@ -325,6 +329,9 @@ local function dissect_switch_info_tlv(buffer, tree)
     subtree:add(fortilink.fields.tlv_uplink1, buffer(9,37))
     subtree:add(fortilink.fields.tlv_uplink2, buffer(46,37))
     subtree:add(fortilink.fields.tlv_capabillity_flag, buffer(86,4))
+    if buffer:len() > 90 then
+        subtree:add(fortilink.fields.tlv_trailing_data, buffer(90,buffer:len()-90))
+    end
 end
 
 local function dissect_data_tlv(buffer, tree, label)
@@ -343,7 +350,10 @@ local function dissect_start_tlv(buffer, tree)
 end
 
 local function dissect_marker_tlv(buffer, tree)
-    add_tlv_tree(buffer, tree, "Marker TLV")
+    local subtree = add_tlv_tree(buffer, tree, "Marker TLV")
+    if buffer:len() > 4 then
+        subtree:add(fortilink.fields.tlv_value, buffer(4,buffer:len()-4))
+    end
 end
 
 local function dissect_named_port_properties_tlv(buffer, tree)
@@ -381,6 +391,9 @@ local function dissect_isl_properties_tlv(buffer, tree)
     subtree:add(fortilink.fields.tlv_isl_trunk, buffer(25,17))
     subtree:add(fortilink.fields.tlv_isl_peer_port, buffer(42,17))
     subtree:add(fortilink.fields.tlv_isl_peer_device, buffer(59,17))
+    if buffer:len() > 76 then
+        subtree:add(fortilink.fields.tlv_trailing_data, buffer(76,buffer:len()-76))
+    end
 end
 
 local function dissect_fgt_properties_tlv(buffer, tree)
@@ -390,6 +403,9 @@ local function dissect_fgt_properties_tlv(buffer, tree)
     subtree:add(fortilink.fields.tlv_fgt_port_port, buffer(8,17))
     subtree:add(fortilink.fields.tlv_fgt_port_fgt_port, buffer(25,17))
     subtree:add(fortilink.fields.tlv_fgt_port_fgt_device, buffer(42,17))
+    if buffer:len() > 59 then
+        subtree:add(fortilink.fields.tlv_trailing_data, buffer(59,buffer:len()-59))
+    end
 end
 
 local tlv_type_function =

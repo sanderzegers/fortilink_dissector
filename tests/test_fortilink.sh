@@ -18,6 +18,7 @@ for field in \
     FortiLink.join_response.status \
     FortiLink.padding \
     FortiLink.tlv_value \
+    FortiLink.tlv_trailing_data \
     FortiLink.tlv_portproperties \
     FortiLink.tlv_portproperties.fortilink \
     FortiLink.tlv_portproperties.isl \
@@ -161,6 +162,20 @@ unknown_tlv=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
     -Y 'frame.number == 4' -T fields -e FortiLink.tlv_type -e FortiLink.tlv_value)
 if [ "$unknown_tlv" != "$(printf '0x9999\tdead')" ]; then
     printf '%s\n' 'Unknown TLV was not preserved:' "$unknown_tlv" >&2
+    exit 1
+fi
+
+partial_known_tlv=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
+    -Y 'frame.number == 7' -T fields -e FortiLink.tlv_type -e FortiLink.tlv_value)
+if [ "$partial_known_tlv" != "$(printf '0x0064\tc0de')" ]; then
+    printf '%s\n' 'Malformed known TLV value bytes were not preserved:' "$partial_known_tlv" >&2
+    exit 1
+fi
+
+marker_tlv=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
+    -Y 'frame.number == 9' -T fields -e FortiLink.tlv_type -e FortiLink.tlv_value)
+if [ "$marker_tlv" != "$(printf '0x5678\tbeef')" ]; then
+    printf '%s\n' 'Known marker TLV value bytes were not preserved:' "$marker_tlv" >&2
     exit 1
 fi
 
