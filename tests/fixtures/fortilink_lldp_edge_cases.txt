@@ -1,0 +1,34 @@
+# Frame 1: subtype 0x03 declares five peer-ID bytes but contains none.
+000000  01 80 c2 00 00 0e 00 11 22 33 44 55 88 cc 02 07
+000010  04 00 11 22 33 44 55 04 07 03 00 11 22 33 44 55
+000020  06 02 00 78 fe 0a 08 5b 0e 03 00 00 02 00 00 05
+000030  00 00
+
+# Frame 2: one peer-ID byte, one trailing byte, and unknown option bits 3/12.
+000000  01 80 c2 00 00 0e 00 11 22 33 44 55 88 cc 02 07
+000010  04 00 11 22 33 44 55 04 07 03 00 11 22 33 44 55
+000020  06 02 00 78 fe 0c 08 5b 0e 03 00 00 12 08 00 01
+000030  41 42 00 00
+
+# Frame 3: subtype 0x03 payload is shorter than its six-byte fixed prefix.
+000000  01 80 c2 00 00 0e 00 11 22 33 44 55 88 cc 02 07
+000010  04 00 11 22 33 44 55 04 07 03 00 11 22 33 44 55
+000020  06 02 00 78 fe 09 08 5b 0e 03 00 00 02 00 00 00
+000030  00
+
+# Frame 4: trunk selector 0x20 means LACP active with slow periodicity.
+000000  01 80 c2 00 00 0e 00 11 22 33 44 55 88 cc 02 07
+000010  04 00 11 22 33 44 55 04 07 03 00 11 22 33 44 55
+000020  06 02 00 78 fe 0a 08 5b 0e 03 00 00 00 20 00 00
+000030  00 00
+
+# Frame 5: trunk selector 0x40 means LACP active with fast periodicity.
+000000  01 80 c2 00 00 0e 00 11 22 33 44 55 88 cc 02 07
+000010  04 00 11 22 33 44 55 04 07 03 00 11 22 33 44 55
+000020  06 02 00 78 fe 0a 08 5b 0e 03 00 00 00 40 00 00
+000030  00 00
+
+# Frame 6: an unknown Fortinet subtype must remain safe and display raw content.
+000000  01 80 c2 00 00 0e 00 11 22 33 44 55 88 cc 02 07
+000010  04 00 11 22 33 44 55 04 07 03 00 11 22 33 44 55
+000020  06 02 00 78 fe 06 08 5b 0e 7f de ad 00 00
