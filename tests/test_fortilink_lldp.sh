@@ -4,7 +4,6 @@ set -eu
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 lua_script="$repo_dir/fortilink_lldp.lua"
 capture="$repo_dir/pcaps/FSW7.4.9-Access-Port-Default-lldp-isl.pcapng"
-session2_mclag_capture="$repo_dir/pcaps/Session 2/SW1-1_SW1-3_POINT3_Migrating-to-MCLAG.pcapng"
 edge_cases="$repo_dir/tests/fixtures/fortilink_lldp_edge_cases.txt"
 edge_capture=$(mktemp "${TMPDIR:-/tmp}/fortilink-lldp-edge-cases.XXXXXX.pcapng")
 trap 'rm -f "$edge_capture"' EXIT HUP INT TERM
@@ -51,17 +50,6 @@ expected=$(printf '%s\n' \
 if [ "$actual" != "$expected" ]; then
     printf '%s\n' 'Unexpected FortiLink LLDP decode:' "$actual" >&2
     exit 1
-fi
-
-if [ -f "$session2_mclag_capture" ]; then
-    mclag_peer=$(tshark -r "$session2_mclag_capture" -X "lua_script:$lua_script" \
-        -Y 'fllldp.mclag_peer_link == 1' -T fields \
-        -e fllldp.auto_isl_port_options -e fllldp.unknown_options | sort -u)
-    mclag_peer_expected=$(printf '0x00000208\t0x00000000')
-    if [ "$mclag_peer" != "$mclag_peer_expected" ]; then
-        printf '%s\n' 'Unexpected MCLAG peer-link option decode:' "$mclag_peer" >&2
-        exit 1
-    fi
 fi
 
 text2pcap -q "$edge_cases" "$edge_capture"

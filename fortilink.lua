@@ -15,7 +15,7 @@
 
 local fortilink_info =
 {
-    version = "0.4a",
+    version = "0.5",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink packets",
     repository = "https://github.com/sanderzegers/fortilink_dissector"
@@ -115,11 +115,13 @@ local port_speed =
     [0x00100000] = "100000cr4",
     [0x00200000] = "40000sr4",
     [0x00400000] = "40000cr4",
-    [0x02000000] = "25000cr",
-    [0x04000000] = "25000sr",
-    [0x08000000] = "50000cr",
-    [0x10000000] = "50000sr",
-    [0x20000000] = "5000auto",
+    [0x00800000] = "40000auto",
+    [0x01000000] = "25000cr",
+    [0x02000000] = "25000sr",
+    [0x04000000] = "50000cr",
+    [0x08000000] = "50000sr",
+    [0x10000000] = "5000auto",
+    [0x20000000] = "2500full",
 }
 
 --- FortiLink fields
@@ -131,6 +133,12 @@ fortilink.fields.flpackettype = ProtoField.uint8("FortiLink.packettype", "Fortil
 fortilink.fields.flcontentlength = ProtoField.uint16("FortiLink.contentlength", "Fortilink Packet Content Length")
 fortilink.fields.flpacketreserved = ProtoField.uint16("FortiLink.packetreserved", "FortiLink Header Control Word", base.HEX)
 fortilink.fields.fsw_header_control = ProtoField.string("FortiLink.header_control.fortiswitch", "FortiSwitch Header Control Interpretation")
+fortilink.fields.fsw_header_fallback_node = ProtoField.bool("FortiLink.header_control.fortiswitch.fallback_node", "FortiSwitch Fallback Node Selector", 16, nil, 0x0080)
+fortilink.fields.fsw_header_isl_controller_present = ProtoField.bool("FortiLink.header_control.fortiswitch.isl_controller_present", "FortiSwitch ISL Controller Present", 16, nil, 0x0004)
+fortilink.fields.fgt_header_control = ProtoField.string("FortiLink.header_control.fortigate", "FortiGate Header Control Interpretation")
+fortilink.fields.fgt_header_admission_fallback = ProtoField.bool("FortiLink.header_control.fortigate.admission_fallback", "FortiGate Admission Fallback Bit", 16, nil, 0x0080)
+fortilink.fields.fgt_header_admission_gate = ProtoField.bool("FortiLink.header_control.fortigate.admission_gate", "FortiGate Local-State Admission Gate Bit", 16, nil, 0x0100)
+fortilink.fields.fgt_header_direct_connect_clear = ProtoField.bool("FortiLink.header_control.fortigate.direct_connect_clear", "FortiGate Direct-Connect Clear Selector", 16, nil, 0x0004)
 -- FortiGate generates this per fortilinkd init from /dev/urandom; FortiSwitch builds observed fixed 0xf1dc.
 fortilink.fields.flendpointnonce = ProtoField.uint16("FortiLink.endpoint_nonce", "Endpoint Nonce", base.HEX)
 
@@ -139,6 +147,11 @@ local fortiswitch_header_control = {
     [0x0114] = "ordinary node; ISL-controller condition present",
     [0x0190] = "internal fallback node (controller-disconnected state)",
     [0x0194] = "internal fallback node; ISL-controller condition present",
+}
+
+local fortigate_header_control = {
+    [0x0082] = "direct-connect admission via bit 0x0080",
+    [0x1ac2] = "direct-connect admission via bits 0x0080 and 0x0100",
 }
 
 
@@ -151,6 +164,7 @@ fortilink.fields.flp_dst_interface = ProtoField.string("FortiLink.dst_interface"
 
 fortilink.fields.send_echo_reply = ProtoField.bytes('FortiLink.send_echo_reply', 'Echo Reply')
 fortilink.fields.join_response_status = ProtoField.uint16("FortiLink.join_response.status", "Join Response Status", base.DEC, join_response_status)
+fortilink.fields.join_request_node_index = ProtoField.uint32("FortiLink.join_request.node_index", "Join Request Node Index", base.DEC)
 fortilink.fields.message_data = ProtoField.bytes("FortiLink.message_data", "Undecoded Message Data")
 fortilink.fields.trailing_data = ProtoField.bytes("FortiLink.trailing_data", "Trailing Protocol Data")
 fortilink.fields.padding = ProtoField.bytes("FortiLink.padding", "Ethernet Padding")
@@ -159,6 +173,8 @@ fortilink.fields.flp_send_update_src_serial = ProtoField.string("FortiLink.send_
 fortilink.fields.flp_send_update_src_interface  = ProtoField.string("FortiLink.send_update.src_interface", "Source Interface")
 
 fortilink.fields.flp_send_disc_resp_static  = ProtoField.uint32("FortiLink.send_discover_response.static1","Static Value?")
+fortilink.fields.discovery_response_selector  = ProtoField.uint16("FortiLink.discovery_response.selector", "Discovery Response Selector", base.HEX)
+fortilink.fields.discovery_response_default_value  = ProtoField.uint32("FortiLink.discovery_response.default_value", "Discovery Response Default Value")
 
 
 -- TLVs
@@ -205,14 +221,19 @@ fortilink.fields.tlv_port_speed_100000sr4 = ProtoField.bool("FortiLink.tlv_port_
 fortilink.fields.tlv_port_speed_100000cr4 = ProtoField.bool("FortiLink.tlv_port_available_speeds.100000cr4", "100 Gbps CR4", 32, nil, 0x00100000)
 fortilink.fields.tlv_port_speed_40000sr4 = ProtoField.bool("FortiLink.tlv_port_available_speeds.40000sr4", "40 Gbps SR4", 32, nil, 0x00200000)
 fortilink.fields.tlv_port_speed_40000cr4 = ProtoField.bool("FortiLink.tlv_port_available_speeds.40000cr4", "40 Gbps CR4", 32, nil, 0x00400000)
-fortilink.fields.tlv_port_speed_25000cr = ProtoField.bool("FortiLink.tlv_port_available_speeds.25000cr", "25 Gbps CR", 32, nil, 0x02000000)
-fortilink.fields.tlv_port_speed_25000sr = ProtoField.bool("FortiLink.tlv_port_available_speeds.25000sr", "25 Gbps SR", 32, nil, 0x04000000)
-fortilink.fields.tlv_port_speed_50000cr = ProtoField.bool("FortiLink.tlv_port_available_speeds.50000cr", "50 Gbps CR", 32, nil, 0x08000000)
-fortilink.fields.tlv_port_speed_50000sr = ProtoField.bool("FortiLink.tlv_port_available_speeds.50000sr", "50 Gbps SR", 32, nil, 0x10000000)
-fortilink.fields.tlv_port_speed_5000auto = ProtoField.bool("FortiLink.tlv_port_available_speeds.5000auto", "5 Gbps Auto-Negotiation", 32, nil, 0x20000000)
+fortilink.fields.tlv_port_speed_40000auto = ProtoField.bool("FortiLink.tlv_port_available_speeds.40000auto", "40 Gbps Auto-Negotiation", 32, nil, 0x00800000)
+fortilink.fields.tlv_port_speed_25000cr = ProtoField.bool("FortiLink.tlv_port_available_speeds.25000cr", "25 Gbps CR", 32, nil, 0x01000000)
+fortilink.fields.tlv_port_speed_25000sr = ProtoField.bool("FortiLink.tlv_port_available_speeds.25000sr", "25 Gbps SR", 32, nil, 0x02000000)
+fortilink.fields.tlv_port_speed_50000cr = ProtoField.bool("FortiLink.tlv_port_available_speeds.50000cr", "50 Gbps CR", 32, nil, 0x04000000)
+fortilink.fields.tlv_port_speed_50000sr = ProtoField.bool("FortiLink.tlv_port_available_speeds.50000sr", "50 Gbps SR", 32, nil, 0x08000000)
+fortilink.fields.tlv_port_speed_5000auto = ProtoField.bool("FortiLink.tlv_port_available_speeds.5000auto", "5 Gbps Auto-Negotiation", 32, nil, 0x10000000)
+fortilink.fields.tlv_port_speed_2500full = ProtoField.bool("FortiLink.tlv_port_available_speeds.2500full", "2.5 Gbps Full-Duplex", 32, nil, 0x20000000)
 fortilink.fields.tlv_port_extension  = ProtoField.bytes("FortiLink.tlv_port_extension", "Unresolved Port Properties Extension")
-fortilink.fields.tlv_port_extension_class = ProtoField.uint32("FortiLink.tlv_port_extension.class", "Extended Port Class (Unresolved)", base.HEX)
-fortilink.fields.tlv_port_extension_speed_mask = ProtoField.uint64("FortiLink.tlv_port_extension.speed_mask", "Extended Available Speeds (Inferred)", base.HEX)
+fortilink.fields.tlv_port_extension_speed_num = ProtoField.uint32("FortiLink.tlv_port_extension.speed_num", "Configured Speed Option Index", base.HEX, port_speed)
+fortilink.fields.tlv_port_extension_speed_mask = ProtoField.uint64("FortiLink.tlv_port_extension.speed_mask", "Extended Available Speed Options", base.HEX)
+fortilink.fields.tlv_port_extension_speed_mask_unknown_bit30 = ProtoField.bool("FortiLink.tlv_port_extension.speed_mask.unknown_bit30", "Unknown Extended Speed Option Bit 30", 32, nil, 0x40000000)
+fortilink.fields.tlv_port_extension_speed_mask_unknown_bit31 = ProtoField.bool("FortiLink.tlv_port_extension.speed_mask.unknown_bit31", "Unknown Extended Speed Option Bit 31", 32, nil, 0x80000000)
+fortilink.fields.tlv_port_extension_speed_mask_unknown_high = ProtoField.uint32("FortiLink.tlv_port_extension.speed_mask.unknown_high32", "Unknown Extended Speed Option Bits 32-63", base.HEX)
 
 local port_available_speed_fields =
 {
@@ -239,11 +260,13 @@ local port_available_speed_fields =
     fortilink.fields.tlv_port_speed_100000cr4,
     fortilink.fields.tlv_port_speed_40000sr4,
     fortilink.fields.tlv_port_speed_40000cr4,
+    fortilink.fields.tlv_port_speed_40000auto,
     fortilink.fields.tlv_port_speed_25000cr,
     fortilink.fields.tlv_port_speed_25000sr,
     fortilink.fields.tlv_port_speed_50000cr,
     fortilink.fields.tlv_port_speed_50000sr,
     fortilink.fields.tlv_port_speed_5000auto,
+    fortilink.fields.tlv_port_speed_2500full,
 }
 
 local port_property_fields =
@@ -256,10 +279,15 @@ local port_property_fields =
 
 fortilink.fields.tlv_magicinfo  = ProtoField.uint16("FortiLink.magicinfo", "Magic Info", base.HEX)
 fortilink.fields.tlv_capabillity_flag  = ProtoField.uint32("FortiLink.capabillity_flag", "Capability Flags", base.HEX)
+fortilink.fields.tlv_capability_data  = ProtoField.bytes("FortiLink.capability_data", "Capability Data")
 fortilink.fields.tlv_maxports  = ProtoField.uint16("FortiLink.maxports", "Max ports")
 fortilink.fields.tlv_multiuplink  = ProtoField.uint8("FortiLink.multiuplink", "Multiuplink")
 fortilink.fields.tlv_uplink1  = ProtoField.string("FortiLink.uplink1", "Uplink 1")
 fortilink.fields.tlv_uplink2  = ProtoField.string("FortiLink.uplink2", "Uplink 2")
+fortilink.fields.tlv_max_poe_budget  = ProtoField.uint16("FortiLink.max_poe_budget", "Max POE Budget")
+fortilink.fields.tlv_poe_detection_type  = ProtoField.uint8("FortiLink.poe_detection_type", "POE Detection Type")
+fortilink.fields.tlv_switch_info_unknown80  = ProtoField.uint8("FortiLink.switch_info.unknown80", "Switch Info Unknown Byte 80", base.HEX)
+fortilink.fields.tlv_switch_info_unknown81  = ProtoField.uint8("FortiLink.switch_info.unknown81", "Switch Info Unknown Byte 81", base.HEX)
 
 fortilink.fields.tlv_isl_properties  = ProtoField.uint32("FortiLink.tlv_isl.properties", "Trunk Properties",base.HEX)
 fortilink.fields.tlv_isl_properties_fortilink = ProtoField.bool("FortiLink.tlv_isl.properties.fortilink","FortiLink",32,nil,0x1)
@@ -321,16 +349,21 @@ local function dissect_port_properties_tlv(buffer, tree)
 end
 
 local function dissect_switch_info_tlv(buffer, tree)
-    local subtree, complete = add_tlv_tree(buffer, tree, "Switch Info TLV", 90)
+    local subtree, complete = add_tlv_tree(buffer, tree, "Switch Info TLV", 98)
     if not complete then return end
     subtree:add(fortilink.fields.tlv_magicinfo, buffer(4,2))
     subtree:add(fortilink.fields.tlv_maxports, buffer(6,2))
     subtree:add(fortilink.fields.tlv_multiuplink, buffer(8,1))
-    subtree:add(fortilink.fields.tlv_uplink1, buffer(9,37))
-    subtree:add(fortilink.fields.tlv_uplink2, buffer(46,37))
+    subtree:add(fortilink.fields.tlv_uplink1, buffer(9,36))
+    subtree:add(fortilink.fields.tlv_uplink2, buffer(45,36))
+    subtree:add(fortilink.fields.tlv_max_poe_budget, buffer(81,2))
+    subtree:add(fortilink.fields.tlv_poe_detection_type, buffer(83,1))
+    subtree:add(fortilink.fields.tlv_switch_info_unknown80, buffer(84,1))
+    subtree:add(fortilink.fields.tlv_switch_info_unknown81, buffer(85,1))
+    subtree:add(fortilink.fields.tlv_capability_data, buffer(86,12))
     subtree:add(fortilink.fields.tlv_capabillity_flag, buffer(86,4))
-    if buffer:len() > 90 then
-        subtree:add(fortilink.fields.tlv_trailing_data, buffer(90,buffer:len()-90))
+    if buffer:len() > 98 then
+        subtree:add(fortilink.fields.tlv_trailing_data, buffer(98,buffer:len()-98))
     end
 end
 
@@ -374,8 +407,11 @@ local function dissect_named_port_properties_tlv(buffer, tree)
     if buffer:len() > 36 then
         local extension = subtree:add(fortilink.fields.tlv_port_extension, buffer(36,buffer:len()-36))
         if buffer:len() >= 48 then
-            extension:add(fortilink.fields.tlv_port_extension_class, buffer(36,4))
-            extension:add(fortilink.fields.tlv_port_extension_speed_mask, buffer(40,8))
+            extension:add(fortilink.fields.tlv_port_extension_speed_num, buffer(36,4))
+            local speed_mask = extension:add(fortilink.fields.tlv_port_extension_speed_mask, buffer(40,8))
+            speed_mask:add(fortilink.fields.tlv_port_extension_speed_mask_unknown_high, buffer(40,4))
+            speed_mask:add(fortilink.fields.tlv_port_extension_speed_mask_unknown_bit30, buffer(44,4))
+            speed_mask:add(fortilink.fields.tlv_port_extension_speed_mask_unknown_bit31, buffer(44,4))
         end
     end
 end
@@ -517,7 +553,13 @@ local function dissect_send_join_request(buffer, pinfo, tree, protocol_end)
     add_fixed_string(buffer, protocol_end, 42, 32, fortilink.fields.flp_src_interface, tree, "Source interface")
     add_fixed_string(buffer, protocol_end, 74, 32, fortilink.fields.flp_dst_serial, tree, "Destination serial")
     add_fixed_string(buffer, protocol_end, 106, 32, fortilink.fields.flp_dst_interface, tree, "Destination interface")
-    add_message_bytes(buffer, protocol_end, 138, fortilink.fields.trailing_data, tree)
+    if protocol_end >= 142 then
+        tree:add(fortilink.fields.join_request_node_index, buffer(138,4))
+        add_message_bytes(buffer, protocol_end, 142, fortilink.fields.trailing_data, tree)
+    else
+        add_message_bytes(buffer, protocol_end, 138, fortilink.fields.message_data, tree)
+        add_malformed(tree, string.format("Join request node index needs 4 bytes; only %d available", math.max(0, protocol_end-138)))
+    end
 end
 
 local function dissect_send_join_response(buffer, pinfo, tree, protocol_end)
@@ -533,15 +575,25 @@ end
 
 local function dissect_send_discovery_response(buffer, pinfo, tree, protocol_end)
     pinfo.cols.info = "Discovery Response"
-    if protocol_end > 10 then
-        tree:add(fortilink.fields.message_data, buffer(10,math.min(2,protocol_end-10)))
+    if protocol_end < 12 then
+        add_message_bytes(buffer, protocol_end, 10, fortilink.fields.message_data, tree)
+        add_malformed(tree, string.format("Discovery response selector needs 2 bytes; only %d available", math.max(0,protocol_end-10)))
+        return
+    end
+    local selector = buffer(10,2):uint()
+    tree:add(fortilink.fields.discovery_response_selector, buffer(10,2))
+    if selector ~= 0 and selector ~= 1 then
+        pinfo.cols.info = "Discovery Response (Short)"
+        add_message_bytes(buffer, protocol_end, 12, fortilink.fields.trailing_data, tree)
+        return
     end
     add_fixed_string(buffer, protocol_end, 12, 32, fortilink.fields.flp_src_serial, tree, "Source serial")
     add_fixed_string(buffer, protocol_end, 44, 32, fortilink.fields.flp_src_interface, tree, "Source interface")
     add_fixed_string(buffer, protocol_end, 76, 32, fortilink.fields.flp_dst_serial, tree, "Destination serial")
     add_fixed_string(buffer, protocol_end, 108, 32, fortilink.fields.flp_dst_interface, tree, "Destination interface")
     if protocol_end >= 144 then
-        tree:add(fortilink.fields.flp_send_disc_resp_static, buffer(140,4))
+        tree:add(fortilink.fields.discovery_response_default_value, buffer(140,4))
+        add_message_bytes(buffer, protocol_end, 144, fortilink.fields.trailing_data, tree)
     else
         add_malformed(tree, string.format("Discovery response needs 144 bytes; only %d available", protocol_end))
     end
@@ -582,6 +634,15 @@ function fortilink.dissector(buffer, pinfo, root)
     local fortiswitch_interpretation = fortiswitch_header_control[header_control]
     if fortiswitch_interpretation then
         subtree:add(fortilink.fields.fsw_header_control, buffer(6,2), fortiswitch_interpretation)
+        subtree:add(fortilink.fields.fsw_header_fallback_node, buffer(6,2))
+        subtree:add(fortilink.fields.fsw_header_isl_controller_present, buffer(6,2))
+    end
+    local fortigate_interpretation = fortigate_header_control[header_control]
+    if fortigate_interpretation then
+        subtree:add(fortilink.fields.fgt_header_control, buffer(6,2), fortigate_interpretation)
+        subtree:add(fortilink.fields.fgt_header_admission_fallback, buffer(6,2))
+        subtree:add(fortilink.fields.fgt_header_admission_gate, buffer(6,2))
+        subtree:add(fortilink.fields.fgt_header_direct_connect_clear, buffer(6,2))
     end
 
     if captured_length < declared_end then
