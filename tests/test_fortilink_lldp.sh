@@ -4,6 +4,7 @@ set -eu
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 lua_script="$repo_dir/fortilink_lldp.lua"
 capture="$repo_dir/pcaps/FSW7.4.9-Access-Port-Default-lldp-isl.pcapng"
+session2_mclag_capture="$repo_dir/pcaps/Session 2/SW1-1_SW1-3_POINT3_Migrating-to-MCLAG.pcapng"
 edge_cases="$repo_dir/tests/fixtures/fortilink_lldp_edge_cases.txt"
 edge_capture=$(mktemp "${TMPDIR:-/tmp}/fortilink-lldp-edge-cases.XXXXXX.pcapng")
 trap 'rm -f "$edge_capture"' EXIT HUP INT TERM
@@ -20,6 +21,9 @@ for field in \
     fllldp.peer_id_len \
     fllldp.peer_id \
     fllldp.unknown_options \
+    fllldp.auto_mclag_link \
+    fllldp.mclag_switch \
+    fllldp.mclag_peer_link \
     fllldp.trunk_mode_selector \
     fllldp.loop_guard \
     fllldp.trailing_data
@@ -49,6 +53,17 @@ if [ "$actual" != "$expected" ]; then
     exit 1
 fi
 
+if [ -f "$session2_mclag_capture" ]; then
+    mclag_peer=$(tshark -r "$session2_mclag_capture" -X "lua_script:$lua_script" \
+        -Y 'fllldp.mclag_peer_link == 1' -T fields \
+        -e fllldp.auto_isl_port_options -e fllldp.unknown_options | sort -u)
+    mclag_peer_expected=$(printf '0x00000208\t0x00000000')
+    if [ "$mclag_peer" != "$mclag_peer_expected" ]; then
+        printf '%s\n' 'Unexpected MCLAG peer-link option decode:' "$mclag_peer" >&2
+        exit 1
+    fi
+fi
+
 text2pcap -q "$edge_cases" "$edge_capture"
 
 truncated=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
@@ -60,10 +75,11 @@ fi
 
 trailing=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
     -Y 'fllldp.trailing_data' -T fields \
-    -e frame.number -e fllldp.peer_id -e fllldp.trailing_data -e fllldp.unknown_options)
-trailing_expected=$(printf '2\tA\t42\t0x00001008')
+    -e frame.number -e fllldp.peer_id -e fllldp.trailing_data \
+    -e fllldp.mclag_peer_link -e fllldp.unknown_options)
+trailing_expected=$(printf '2\tA\t42\t1\t0x00001000')
 if [ "$trailing" != "$trailing_expected" ]; then
-    printf '%s\n' 'Unexpected trailing-data/unknown-bit decode:' "$trailing" >&2
+    printf '%s\n' 'Unexpected trailing-data/MCLAG-peer/unknown-bit decode:' "$trailing" >&2
     exit 1
 fi
 

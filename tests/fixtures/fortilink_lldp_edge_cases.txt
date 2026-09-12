@@ -4,7 +4,8 @@
 000020  06 02 00 78 fe 0a 08 5b 0e 03 00 00 02 00 00 05
 000030  00 00
 
-# Frame 2: one peer-ID byte, one trailing byte, and unknown option bits 3/12.
+# Frame 2: one peer-ID byte, one trailing byte, MCLAG peer-link bit 3,
+# and unknown option bit 12.
 000000  01 80 c2 00 00 0e 00 11 22 33 44 55 88 cc 02 07
 000010  04 00 11 22 33 44 55 04 07 03 00 11 22 33 44 55
 000020  06 02 00 78 fe 0c 08 5b 0e 03 00 00 12 08 00 01

@@ -122,23 +122,25 @@ fllldp.fields.tlv_content = ProtoField.bytes("fllldp.content", "Raw content")
 
 -- Trunk Flags
 fllldp.fields.fllldp_isl_port_options = ProtoField.uint32("fllldp.auto_isl_port_options","ISL Link options",base.HEX)
- -- Auto create ISL between switches:
+-- Auto create ISL between switches.
 fllldp.fields.fllldp_auto_isl = ProtoField.bool("fllldp.auto_isl","auto-isl",32,nil,0x1)
- -- Create auto mclag isl between switches:
- fllldp.fields.fllldp_auto_mclag_isl = ProtoField.bool("fllldp.auto_mclag_isl","auto-mclag-icl",32,nil,0x2)
- -- Switch is already configured as MCLAG switch:
- fllldp.fields.fllldp_mclag_switch = ProtoField.bool("fllldp.is_mclag_switch","mclag-switch",32,nil,0x4)
- -- Switch requests ISL-Fortilink
- fllldp.fields.fllldp_isl_fortilink = ProtoField.bool("fllldp.isl_fortilink","isl-fortilink",32,nil,0x10)
- fllldp.fields.fllldp_trunk_mode_selector = ProtoField.uint32("fllldp.trunk_mode_selector","Trunk mode selector",base.DEC,isl_trunk_mode_selectors,0x60)
- fllldp.fields.fllldp_loop_guard = ProtoField.bool("fllldp.loop_guard","Loop guard",32,nil,0x80)
- fllldp.fields.fllldp_trunk_flags = ProtoField.uint32("fllldp.trunk_flags","Legacy grouped trunk flags",base.HEX,nil,0xe0)
- fllldp.fields.fllldp_fortilink_trunk = ProtoField.bool("fllldp.fortilink_trunk","FortiLink trunk mode",32,nil,0x100)
- fllldp.fields.fllldp_auto_network = ProtoField.bool("fllldp.auto_network","Auto-network enabled",32,nil,0x200)
- fllldp.fields.fllldp_p2p = ProtoField.bool("fllldp.p2p","P2P mode",32,nil,0x400)
- fllldp.fields.fllldp_static_isl = ProtoField.bool("fllldp.static_isl","Static ISL",32,nil,0x800)
- fllldp.fields.fllldp_mrp = ProtoField.bool("fllldp.mrp","MRP mode",32,nil,0x2000)
- fllldp.fields.fllldp_unknown_options = ProtoField.uint32("fllldp.unknown_options","Unknown option bits",base.HEX)
+-- Create/participate in an automatically managed MCLAG link.
+fllldp.fields.fllldp_auto_mclag_link = ProtoField.bool("fllldp.auto_mclag_link","auto-mclag-link",32,nil,0x2)
+-- Switch is already configured as an MCLAG switch.
+fllldp.fields.fllldp_mclag_switch = ProtoField.bool("fllldp.mclag_switch","mclag-switch",32,nil,0x4)
+-- Observed on the MCLAG peer during Session 2 ICL migration.
+fllldp.fields.fllldp_mclag_peer_link = ProtoField.bool("fllldp.mclag_peer_link","MCLAG peer link (inferred)",32,nil,0x8)
+-- Switch requests ISL-Fortilink.
+fllldp.fields.fllldp_isl_fortilink = ProtoField.bool("fllldp.isl_fortilink","isl-fortilink",32,nil,0x10)
+fllldp.fields.fllldp_trunk_mode_selector = ProtoField.uint32("fllldp.trunk_mode_selector","Trunk mode selector",base.DEC,isl_trunk_mode_selectors,0x60)
+fllldp.fields.fllldp_loop_guard = ProtoField.bool("fllldp.loop_guard","Loop guard",32,nil,0x80)
+fllldp.fields.fllldp_trunk_flags = ProtoField.uint32("fllldp.trunk_flags","Legacy grouped trunk flags",base.HEX,nil,0xe0)
+fllldp.fields.fllldp_fortilink_trunk = ProtoField.bool("fllldp.fortilink_trunk","FortiLink trunk mode",32,nil,0x100)
+fllldp.fields.fllldp_auto_network = ProtoField.bool("fllldp.auto_network","Auto-network enabled",32,nil,0x200)
+fllldp.fields.fllldp_p2p = ProtoField.bool("fllldp.p2p","P2P mode",32,nil,0x400)
+fllldp.fields.fllldp_static_isl = ProtoField.bool("fllldp.static_isl","Static ISL",32,nil,0x800)
+fllldp.fields.fllldp_mrp = ProtoField.bool("fllldp.mrp","MRP mode",32,nil,0x2000)
+fllldp.fields.fllldp_unknown_options = ProtoField.uint32("fllldp.unknown_options","Unknown option bits",base.HEX)
 
 
 
@@ -225,8 +227,9 @@ function fllldp.dissector(tvb,pinfo,root)
         local subtree = tree:add(fllldp.fields.fllldp_isl_port_options,options_range)
 
         subtree:add(fllldp.fields.fllldp_auto_isl,options_range)
-        subtree:add(fllldp.fields.fllldp_auto_mclag_isl,options_range)
+        subtree:add(fllldp.fields.fllldp_auto_mclag_link,options_range)
         subtree:add(fllldp.fields.fllldp_mclag_switch,options_range)
+        subtree:add(fllldp.fields.fllldp_mclag_peer_link,options_range)
         subtree:add(fllldp.fields.fllldp_isl_fortilink,options_range)
         subtree:add(fllldp.fields.fllldp_trunk_mode_selector,options_range)
         subtree:add(fllldp.fields.fllldp_loop_guard,options_range)
@@ -236,7 +239,7 @@ function fllldp.dissector(tvb,pinfo,root)
         subtree:add(fllldp.fields.fllldp_p2p,options_range)
         subtree:add(fllldp.fields.fllldp_static_isl,options_range)
         subtree:add(fllldp.fields.fllldp_mrp,options_range)
-        local unknown_options = clear_option_bits(options_range:uint(),0x2ff7)
+        local unknown_options = clear_option_bits(options_range:uint(),0x2fff)
         subtree:add(fllldp.fields.fllldp_unknown_options,options_range,unknown_options)
 
         tree:add(fllldp.fields.fllldp_isl_port_group,tlv_content(4,1))
