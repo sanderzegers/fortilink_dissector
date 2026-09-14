@@ -16,7 +16,7 @@
 
 local fllldp_info =
 {
-    version = "0.6",
+    version = "0.6a",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink LLDP Payloads",
     repository = "https://github.com/sanderzegers/fortilink_dissector"
@@ -134,7 +134,6 @@ fllldp.fields.fllldp_mclag_peer_link = ProtoField.bool("fllldp.mclag_peer_link",
 fllldp.fields.fllldp_isl_fortilink = ProtoField.bool("fllldp.isl_fortilink","isl-fortilink",32,nil,0x10)
 fllldp.fields.fllldp_trunk_mode_selector = ProtoField.uint32("fllldp.trunk_mode_selector","Trunk mode selector",base.DEC,isl_trunk_mode_selectors,0x60)
 fllldp.fields.fllldp_loop_guard = ProtoField.bool("fllldp.loop_guard","Loop guard",32,nil,0x80)
-fllldp.fields.fllldp_trunk_flags = ProtoField.uint32("fllldp.trunk_flags","Legacy grouped trunk flags",base.HEX,nil,0xe0)
 fllldp.fields.fllldp_fortilink_trunk = ProtoField.bool("fllldp.fortilink_trunk","FortiLink trunk mode",32,nil,0x100)
 fllldp.fields.fllldp_auto_network = ProtoField.bool("fllldp.auto_network","Auto-network enabled",32,nil,0x200)
 fllldp.fields.fllldp_p2p = ProtoField.bool("fllldp.p2p","P2P mode",32,nil,0x400)
@@ -233,7 +232,6 @@ function fllldp.dissector(tvb,pinfo,root)
         subtree:add(fllldp.fields.fllldp_isl_fortilink,options_range)
         subtree:add(fllldp.fields.fllldp_trunk_mode_selector,options_range)
         subtree:add(fllldp.fields.fllldp_loop_guard,options_range)
-        subtree:add(fllldp.fields.fllldp_trunk_flags,options_range):set_hidden()
         subtree:add(fllldp.fields.fllldp_fortilink_trunk,options_range)
         subtree:add(fllldp.fields.fllldp_auto_network,options_range)
         subtree:add(fllldp.fields.fllldp_p2p,options_range)

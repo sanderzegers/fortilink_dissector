@@ -26,8 +26,8 @@ for field in \
     FortiLink.tlv_trailing_data \
     FortiLink.max_poe_budget \
     FortiLink.poe_detection_type \
-    FortiLink.switch_info.unknown80 \
-    FortiLink.switch_info.unknown81 \
+    FortiLink.switch_info.version \
+    FortiLink.switch_info.max_trunk \
     FortiLink.capability_data \
     FortiLink.tlv_portproperties \
     FortiLink.tlv_portproperties.fortilink \
@@ -157,12 +157,12 @@ switch_info=$(tshark -r "$capture" -X "lua_script:$lua_script" \
     -e FortiLink.uplink2 \
     -e FortiLink.max_poe_budget \
     -e FortiLink.poe_detection_type \
-    -e FortiLink.switch_info.unknown80 \
-    -e FortiLink.switch_info.unknown81 \
+    -e FortiLink.switch_info.version \
+    -e FortiLink.switch_info.max_trunk \
     -e FortiLink.capability_data \
     -e FortiLink.capabillity_flag \
     -e FortiLink.tlv_trailing_data)
-switch_info_expected=$(printf '0x0ace\t28\t0\tinternal\t\t0\t3\t0x01\t0x08\t94c2b9d71101267500000002\t0x94c2b9d7\t00000000000000000000000000000000000000000000000000000000000000000000')
+switch_info_expected=$(printf '0x0ace\t28\t0\tinternal\t\t0\t3\t1\t8\t94c2b9d71101267500000002\t0x94c2b9d7\t00000000000000000000000000000000000000000000000000000000000000000000')
 if [ "$switch_info" != "$switch_info_expected" ]; then
     printf '%s\n' 'Unexpected switch-info TLV decode:' "$switch_info" >&2
     exit 1

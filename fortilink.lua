@@ -15,7 +15,7 @@
 
 local fortilink_info =
 {
-    version = "0.5",
+    version = "0.5a",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink packets",
     repository = "https://github.com/sanderzegers/fortilink_dissector"
@@ -286,8 +286,8 @@ fortilink.fields.tlv_uplink1  = ProtoField.string("FortiLink.uplink1", "Uplink 1
 fortilink.fields.tlv_uplink2  = ProtoField.string("FortiLink.uplink2", "Uplink 2")
 fortilink.fields.tlv_max_poe_budget  = ProtoField.uint16("FortiLink.max_poe_budget", "Max POE Budget")
 fortilink.fields.tlv_poe_detection_type  = ProtoField.uint8("FortiLink.poe_detection_type", "POE Detection Type")
-fortilink.fields.tlv_switch_info_unknown80  = ProtoField.uint8("FortiLink.switch_info.unknown80", "Switch Info Unknown Byte 80", base.HEX)
-fortilink.fields.tlv_switch_info_unknown81  = ProtoField.uint8("FortiLink.switch_info.unknown81", "Switch Info Unknown Byte 81", base.HEX)
+fortilink.fields.tlv_switch_info_version  = ProtoField.uint8("FortiLink.switch_info.version", "Switch Info Version")
+fortilink.fields.tlv_switch_info_max_trunk  = ProtoField.uint8("FortiLink.switch_info.max_trunk", "Switch Info Max Trunk Members")
 
 fortilink.fields.tlv_isl_properties  = ProtoField.uint32("FortiLink.tlv_isl.properties", "Trunk Properties",base.HEX)
 fortilink.fields.tlv_isl_properties_fortilink = ProtoField.bool("FortiLink.tlv_isl.properties.fortilink","FortiLink",32,nil,0x1)
@@ -358,8 +358,8 @@ local function dissect_switch_info_tlv(buffer, tree)
     subtree:add(fortilink.fields.tlv_uplink2, buffer(45,36))
     subtree:add(fortilink.fields.tlv_max_poe_budget, buffer(81,2))
     subtree:add(fortilink.fields.tlv_poe_detection_type, buffer(83,1))
-    subtree:add(fortilink.fields.tlv_switch_info_unknown80, buffer(84,1))
-    subtree:add(fortilink.fields.tlv_switch_info_unknown81, buffer(85,1))
+    subtree:add(fortilink.fields.tlv_switch_info_version, buffer(84,1))
+    subtree:add(fortilink.fields.tlv_switch_info_max_trunk, buffer(85,1))
     subtree:add(fortilink.fields.tlv_capability_data, buffer(86,12))
     subtree:add(fortilink.fields.tlv_capabillity_flag, buffer(86,4))
     if buffer:len() > 98 then
