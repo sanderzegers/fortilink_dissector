@@ -1,4 +1,4 @@
-# Fortinet FortiLink Wireshark Dissector
+# Wireshark Lua dissectors for FortiLink (EtherType 0x88ff) and Fortinet LLDP extensions
 
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
 [![CI](https://github.com/sanderzegers/fortilink_dissector/actions/workflows/test.yml/badge.svg)](https://github.com/sanderzegers/fortilink_dissector/actions/workflows/test.yml)
