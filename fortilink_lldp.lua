@@ -90,8 +90,6 @@ local isl_trunk_mode_selectors =
     [0x03] = "Static/non-LACP (alternate encoding)",
 }
 
--- Lua 5.4 removed the bit32 library. Keep option masking compatible with
--- Wireshark builds using Lua 5.2 through 5.4.
 local function clear_option_bits(value,mask)
     local bit_value = 1
 

@@ -1,0 +1,31 @@
+name: Regression tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends tshark wireshark-common lua5.2
+      - name: Check test tools
+        run: |
+          tshark --version
+          text2pcap --version
+          luac -v
+      - name: Run FortiLink regression tests
+        run: tests/test_fortilink.sh
+      - name: Run FortiLink LLDP regression tests
+        run: tests/test_fortilink_lldp.sh

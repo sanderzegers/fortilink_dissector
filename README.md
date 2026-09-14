@@ -1,49 +1,82 @@
 # Fortinet FortiLink Wireshark Dissector
 
 [![License](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](LICENSE)
+[![CI](https://github.com/sanderzegers/fortilink_dissector/actions/workflows/test.yml/badge.svg)](https://github.com/sanderzegers/fortilink_dissector/actions/workflows/test.yml)
 
-## Description
+Wireshark Lua dissectors for the proprietary FortiLink Ethernet protocol (`0x88ff`) and Fortinet LLDP extensions. Decode discovery, join, echo, and switch-property messages exchanged between FortiGate and FortiSwitch devices.
 
-FortiSwitches operating in FortiLink mode utilize a range of protocols—including LLDP, CAPWAP, HTTPS-based API calls, and the FortiLink protocol (Ethernet 0x88ff)—for management and configuration.
-This repository contains a Wireshark dissector for the Fortinet FortiLink protocol and FortiLink LLDP extensions. 
-The dissector enables Wireshark to decode and display FortiLink messages, making it easier to analyze and troubleshoot network communication between these devices.
+![FortiLink traffic decoded in Wireshark](images/wireshark.png)
 
-![Wireshark Screenshot](/images/wireshark.png)
+## Project status
+
+**Maintenance mode.** New protocol investigation is not currently planned. Bug fixes and additional mappings supported by evidence are welcome.
+
+Coverage is incomplete and primarily reflects the firmware combinations and traffic documented in the included captures. Other versions may introduce additional or changed fields.
 
 ## Features
 
-- Decode FortiLink protocol messages and display packet details in Wireshark.
-- Decode FortiLink LLDP messages and display packet details in Wireshark.
-- Detailed information about message types, fields, and values.
-- Automatic recognition of FortiLink packets within capture files.
+- Discovery, discovery response, join request/response, echo, echo reply, and update message recognition.
+- Switch information, named port properties, port roles, and speed options.
+- Fortinet LLDP hostname, serial-number, and link-properties extensions.
+- Length checks and diagnostics for malformed or truncated data.
+- Raw display of unknown message types, TLVs, and LLDP subtypes.
+- Sanitized reference captures and automated regression tests.
 
-## Sample Captures
-
-The [`pcaps`](pcaps/README.md) folder contains sanitized packet captures of FortiLink discovery and authorization, along with FortiLink LLDP traffic from different access-port profiles.
-
-The captures contain only LLDP and FortiLink (`0x88ff`) traffic. CAPWAP/DTLS and HTTPS management traffic is not included. See the capture README for the topology, device versions, capture points, and individual file descriptions.
-
-## Display Filters
-
-FortiLink LLDP extension fields use the `fllldp` namespace. Useful structural filters include `fllldp.tlv.type`, `fllldp.tlv.len`, `fllldp.oui`, `fllldp.subtype`, and `fllldp.content`.
-
-Payload filters such as `fllldp.auto_isl_port_options`, `fllldp.auto_network`, `fllldp.peer_id`, and `fllldp.trailing_data` expose decoded link-property values.
+These dissectors cover FortiLink `0x88ff` and Fortinet LLDP extensions. They do not decode CAPWAP/DTLS, HTTPS management exchanges, or EtherType `0x88fe`.
 
 ## Installation
 
-1. Launch Wireshark.
-2. Go to "Help" -> "About Wireshark" -> "Folders" -> "Personal Lua Plugins".
-3. Copy the `fortilink.lua` and `fortilink_lldp.lua` files from this repository into the "Personal Lua Plugins" folder.
-4. Restart Wireshark to enable the custom dissector.
+1. Open Wireshark.
+2. Go to **Help → About Wireshark → Folders**.
+3. Open the **Personal Lua Plugins** folder.
+4. Copy `fortilink.lua` and `fortilink_lldp.lua` into that folder.
+5. Restart Wireshark.
 
-## Known limitations
+## Display filters
 
-This dissector is still under development. Some fields are still missing, and some may be incorrect.
+| Filter | Shows |
+| --- | --- |
+| `fortilink` | FortiLink protocol traffic |
+| `FortiLink.packettype == 0x02` | Join requests |
+| `FortiLink.join_response.status == 3` | Join responses reporting an error |
+| `FortiLink.tlv_type == 0x0067` | Messages containing named port properties of type `0x0067` |
+| `fllldp` | Fortinet LLDP extensions |
+| `fllldp.subtype == 0x03` | LLDP link-properties extensions |
+| `fllldp.auto_network == 1` | LLDP advertisements with auto-network enabled |
 
-## Disclaimers
+Field names are case-sensitive: FortiLink fields generally use `FortiLink`, while LLDP extension fields use `fllldp`.
 
-This dissector is provided for educational and troubleshooting purposes only. No guarantees are provided.
+## Reference captures
+
+The [capture collection](pcaps/README.md) includes sanitized FortiLink discovery and authorization exchanges, plus LLDP traffic from different access-port profiles.
+
+The FortiLink captures cover FortiOS **6.4.8** and **7.4.12**, each paired with FortiSwitchOS **7.4.9**. The capture guide documents topology, capture points, firmware versions, and anonymization.
+
+Only LLDP and FortiLink (`0x88ff`) traffic is included.
+
+## Protocol reference
+
+See [docs/protocol.md](docs/protocol.md) for message types, TLV layouts, speed masks, LLDP options, and unresolved fields.
+
+The reference distinguishes **confirmed**, **strongly observed**, **implementation-derived**, **inferred**, and **unknown** interpretations.
+
+## Tests
+
+The regression suite checks decoded values in the reference captures and handling of synthetic malformed, truncated, and unknown input.
+
+With `tshark`, `text2pcap`, and `luac` installed, run:
+
+```sh
+tests/test_fortilink.sh
+tests/test_fortilink_lldp.sh
+```
+
+GitHub Actions runs both scripts on pushes and pull requests.
+
+## Disclaimer
+
+This project is intended for protocol analysis and troubleshooting. Decoding may be incomplete or incorrect; consult the protocol reference for interpretation limits.
 
 ## License
 
-This project is licensed under the [GNU General Public License v2.0 or later](LICENSE).
+[GNU General Public License v2.0 or later](LICENSE).
