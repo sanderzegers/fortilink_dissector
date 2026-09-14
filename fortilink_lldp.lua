@@ -16,7 +16,7 @@
 
 local fllldp_info =
 {
-    version = "0.6a",
+    version = "0.9.0",
     author = "Sander Zegers",
     description = "This plugin parses Fortinet FortiLink LLDP Payloads",
     repository = "https://github.com/sanderzegers/fortilink_dissector"
