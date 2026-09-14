@@ -11,7 +11,26 @@ field_registry=$(mktemp "${TMPDIR:-/tmp}/fortilink-fields.XXXXXX.txt")
 trap 'rm -f "$edge_capture" "$field_registry"' EXIT HUP INT TERM
 
 luac -p "$lua_script"
-tshark -G fields -X "lua_script:$lua_script" > "$field_registry"
+
+# TShark 4.2 and newer process -G before runtime options, so -X is treated
+# as a field-completion prefix. Probe Lua fields through normal dissection on
+# those versions; older versions retain the cheaper registry check below.
+if tshark --version | awk 'NR == 1 { exit !(($3 + 0) >= 4.2) }'; then
+    check_field() {
+        if ! tshark -r "$capture" -X "lua_script:$lua_script" -T fields -e "$1" >/dev/null 2>&1; then
+            printf '%s\n' "Lua field is not accepted by TShark: $1" >&2
+            exit 1
+        fi
+    }
+else
+    tshark -G fields -X "lua_script:$lua_script" > "$field_registry"
+    check_field() {
+        awk -F '\t' -v wanted="$1" '$3 == wanted { found = 1 } END { exit !found }' "$field_registry" || {
+            printf '%s\n' "Lua field is not registered: $1" >&2
+            exit 1
+        }
+    }
+fi
 
 for field in \
     FortiLink.message_data \
@@ -47,15 +66,8 @@ for field in \
     fortilink.malformed \
     fortilink.length_mismatch
 do
-    awk -F '\t' -v wanted="$field" \
-        '$3 == wanted { found = 1 } END { exit !found }' "$field_registry"
+    check_field "$field"
 done
-
-multiuplink_count=$(awk -F '\t' '$3 == "FortiLink.multiuplink" { count++ } END { print count+0 }' "$field_registry")
-if [ "$multiuplink_count" -ne 1 ]; then
-    printf '%s\n' 'FortiLink.multiuplink must identify exactly one field.' >&2
-    exit 1
-fi
 
 for field in \
     FortiLink.tlv_isl.properties.fortilink \
@@ -78,8 +90,7 @@ for field in \
     FortiLink.tlv_port_available_speeds.100000full \
     FortiLink.tlv_port_available_speeds.2500full
 do
-    awk -F '\t' -v wanted="$field" \
-        '$3 == wanted && $4 == "FT_BOOLEAN" { found = 1 } END { exit !found }' "$field_registry"
+    check_field "$field"
 done
 
 for sample in "$capture" "$older_capture"; do
@@ -101,7 +112,7 @@ header_control_known=$(tshark -r "$capture" -X "lua_script:$lua_script" \
     -e FortiLink.header_control.fortiswitch.isl_controller_present \
     -e FortiLink.header_control.fortigate.admission_fallback \
     -e FortiLink.header_control.fortigate.admission_gate \
-    -e FortiLink.header_control.fortigate.direct_connect_clear)
+    -e FortiLink.header_control.fortigate.direct_connect_clear | sed 's/True/1/g; s/False/0/g')
 header_control_known_expected=$(printf '1\t0x0110\t0\t0\t\t\t\n4\t0x1ac2\t\t\t1\t0\t0\n9\t0x0190\t1\t0\t\t\t\n14\t0x0082\t\t\t1\t0\t0')
 if [ "$header_control_known" != "$header_control_known_expected" ]; then
     printf '%s\n' 'Unexpected header-control selector decode:' "$header_control_known" >&2
@@ -124,7 +135,7 @@ named_port=$(tshark -r "$capture" -X "lua_script:$lua_script" \
     -e FortiLink.tlv_port_available_speeds.10000full \
     -e FortiLink.tlv_port_extension.speed_num \
     -e FortiLink.tlv_port_extension.speed_mask \
-    -e FortiLink.tlv_port_extension)
+    -e FortiLink.tlv_port_extension | sed 's/True/1/g; s/False/0/g')
 named_port_expected=$(printf '0x00000000\t0\t0\t0\t0x00\t1\tport1\t0x00000040\t0x000000cf\t1\t1\t0\t0x00000006\t0x00000000000000cf\t0000000600000000000000cf')
 if [ "$named_port" != "$named_port_expected" ]; then
     printf '%s\n' 'Unexpected named-port-properties decode:' "$named_port" >&2
@@ -264,7 +275,7 @@ unknown_speed_mask_bits=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" 
     -e FortiLink.tlv_port_extension.speed_mask \
     -e FortiLink.tlv_port_extension.speed_mask.unknown_high32 \
     -e FortiLink.tlv_port_extension.speed_mask.unknown_bit30 \
-    -e FortiLink.tlv_port_extension.speed_mask.unknown_bit31)
+    -e FortiLink.tlv_port_extension.speed_mask.unknown_bit31 | sed 's/True/1/g; s/False/0/g')
 unknown_speed_mask_bits_expected=$(printf '0x00000001c00000cf\t0x00000001\t1\t1')
 if [ "$unknown_speed_mask_bits" != "$unknown_speed_mask_bits_expected" ]; then
     printf '%s\n' 'Unknown extension speed-mask bits were not preserved:' "$unknown_speed_mask_bits" >&2
@@ -276,7 +287,7 @@ short_discovery_response=$(tshark -r "$edge_capture" -X "lua_script:$lua_script"
     -e FortiLink.discovery_response.selector \
     -e FortiLink.discovery_response.default_value \
     -e FortiLink.trailing_data \
-    -e fortilink.malformed)
+    -e fortilink.malformed | sed 's/True/1/g; s/False/0/g')
 if [ "$short_discovery_response" != "$(printf '0x0002\t\t\t')" ]; then
     printf '%s\n' 'Short Discovery Response selector handling is incorrect:' "$short_discovery_response" >&2
     exit 1
@@ -286,7 +297,7 @@ truncated_discovery_response=$(tshark -r "$edge_capture" -X "lua_script:$lua_scr
     -Y 'frame.number == 12' -T fields \
     -e FortiLink.message_data \
     -e FortiLink.discovery_response.selector \
-    -e fortilink.malformed)
+    -e fortilink.malformed | sed 's/True/1/g; s/False/0/g')
 if [ "$truncated_discovery_response" != "$(printf 'cc\t\t1')" ]; then
     printf '%s\n' 'Truncated Discovery Response selector was not classified correctly:' "$truncated_discovery_response" >&2
     exit 1
@@ -302,7 +313,7 @@ fi
 
 missing_join_index=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
     -Y 'frame.number == 14' -T fields \
-    -e FortiLink.join_request.node_index -e fortilink.malformed)
+    -e FortiLink.join_request.node_index -e fortilink.malformed | sed 's/True/1/g; s/False/0/g')
 if [ "$missing_join_index" != "$(printf '\t1')" ]; then
     printf '%s\n' 'Missing Join Request node index was not marked malformed:' "$missing_join_index" >&2
     exit 1

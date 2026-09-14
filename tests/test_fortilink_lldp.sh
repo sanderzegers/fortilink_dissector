@@ -10,7 +10,22 @@ trap 'rm -f "$edge_capture"' EXIT HUP INT TERM
 
 luac -p "$lua_script"
 
-fields=$(tshark -G fields -X "lua_script:$lua_script")
+if tshark --version | awk 'NR == 1 { exit !(($3 + 0) >= 4.2) }'; then
+    check_field() {
+        if ! tshark -r "$capture" -X "lua_script:$lua_script" -T fields -e "$1" >/dev/null 2>&1; then
+            printf '%s\n' "Lua field is not accepted by TShark: $1" >&2
+            exit 1
+        fi
+    }
+else
+    fields=$(tshark -G fields -X "lua_script:$lua_script")
+    check_field() {
+        printf '%s\n' "$fields" | awk -F '\t' -v wanted="$1" '$3 == wanted { found = 1 } END { exit !found }' || {
+            printf '%s\n' "Lua field is not registered: $1" >&2
+            exit 1
+        }
+    }
+fi
 for field in \
     fllldp.tlv.type \
     fllldp.tlv.len \
@@ -27,8 +42,7 @@ for field in \
     fllldp.loop_guard \
     fllldp.trailing_data
 do
-    printf '%s\n' "$fields" | awk -F '\t' -v wanted="$field" \
-        '$3 == wanted { found = 1 } END { exit !found }'
+    check_field "$field"
 done
 
 actual=$(tshark -r "$capture" -X "lua_script:$lua_script" \
@@ -39,7 +53,7 @@ actual=$(tshark -r "$capture" -X "lua_script:$lua_script" \
     -e fllldp.auto_isl_port_group \
     -e fllldp.peer_id_len \
     -e fllldp.peer_id \
-    -e fllldp.unknown_options)
+    -e fllldp.unknown_options | sed 's/True/1/g; s/False/0/g')
 
 expected=$(printf '%s\n' \
     '3|0x00000200|1|0|16|S124ENTQ12345678|0x00000000' \
@@ -64,7 +78,7 @@ fi
 trailing=$(tshark -r "$edge_capture" -X "lua_script:$lua_script" \
     -Y 'fllldp.trailing_data' -T fields \
     -e frame.number -e fllldp.peer_id -e fllldp.trailing_data \
-    -e fllldp.mclag_peer_link -e fllldp.unknown_options)
+    -e fllldp.mclag_peer_link -e fllldp.unknown_options | sed 's/True/1/g; s/False/0/g')
 trailing_expected=$(printf '2\tA\t42\t1\t0x00001000')
 if [ "$trailing" != "$trailing_expected" ]; then
     printf '%s\n' 'Unexpected trailing-data/MCLAG-peer/unknown-bit decode:' "$trailing" >&2
