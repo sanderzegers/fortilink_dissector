@@ -5,7 +5,7 @@
 
 Wireshark Lua dissectors for the proprietary FortiLink Ethernet protocol (`0x88ff`) and Fortinet LLDP extensions. Decode discovery, join, echo, and switch-property messages exchanged between FortiGate and FortiSwitch devices.
 
-![FortiLink traffic decoded in Wireshark](images/wireshark.png)
+![FortiLink traffic decoded in Wireshark](images/wiresharkb.png)
 
 ## Project status
 
